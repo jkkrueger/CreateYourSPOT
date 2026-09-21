@@ -484,13 +484,6 @@
     font-variant-numeric: tabular-nums;
   }
   .cat-card-hint { font-size: 10px; color: #5e646d; padding: 3px 10px 0; font-style: italic; }
-  .cat-card-add {
-    margin: 10px; margin-top: auto; cursor: pointer; background: var(--accent); color: #17191d; border: none;
-    border-radius: 7px; font-size: 12px; font-weight: 700; padding: 9px; white-space: nowrap;
-    transition: background .15s var(--ease-snap), transform .12s var(--ease-snap);
-  }
-  .cat-card-add:hover { background: #f4b357; }
-  .cat-card-add:active { transform: scale(.95); }
   .cat-drawer-nav {
     flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 14px;
     padding: 10px; border-top: 1px solid var(--line); background: var(--panel-2); font-size: 12px; color: var(--muted);
@@ -705,6 +698,31 @@
 
   /* Katalog-Markierung: angeklickte Karte + zugehörige Rampen in der Szene */
   .cat-card.marked { border-color: var(--accent-2); box-shadow: 0 0 0 2px rgba(123,196,127,.3); }
+  /* Rampentyp, von dem gerade kein Exemplar in der Halle steht */
+  .cat-card.leer { opacity: .62; }
+  .cat-card.leer .cat-card-thumb img { filter: grayscale(1); }
+  .cat-card-gone { font-size: 11px; font-weight: 600; color: var(--danger); padding: 3px 10px 0; }
+  .cat-card-back {
+    margin: 10px; margin-top: auto; cursor: pointer; background: var(--accent-2); color: #17191d;
+    border: none; border-radius: 7px; font-size: 12px; font-weight: 700; padding: 9px; white-space: nowrap;
+    transition: background .15s var(--ease-snap), transform .12s var(--ease-snap);
+  }
+  .cat-card-back:hover { background: #94d197; }
+  .cat-card-back:active { transform: scale(.95); }
+  .cat-card-back:disabled { background: var(--panel); color: #5e646d; cursor: default; }
+
+  .cat-filter {
+    flex: 0 0 auto; display: flex; gap: 6px; padding: 10px 16px;
+    border-bottom: 1px solid var(--line); background: var(--panel-2);
+  }
+  .cat-filter button {
+    flex: 1; cursor: pointer; background: var(--panel); color: var(--muted);
+    border: 1px solid var(--line); border-radius: 7px; padding: 7px 4px;
+    font-size: 11.5px; font-weight: 600; white-space: nowrap;
+    transition: background .15s var(--ease-snap), color .15s var(--ease-snap), border-color .15s var(--ease-snap);
+  }
+  .cat-filter button:hover { background: #272c33; color: var(--text); }
+  .cat-filter button.active { border-color: var(--accent); color: var(--accent); }
 
   /* ── Besucher-Layer (eigene Gruppierung, unabhängig von den Rhino-Layern) ── */
   .vl-new { display: flex; gap: 6px; margin-bottom: 8px; }
@@ -1117,6 +1135,11 @@
     <div class="cat-drawer-head">
       <b>Katalog <span id="catDrawerCount"></span></b>
       <button id="catDrawerClose" title="Schließen">✕</button>
+    </div>
+    <div class="cat-filter" id="catFilter">
+      <button data-f="alle" class="active">Alle</button>
+      <button data-f="platziert">In der Halle</button>
+      <button data-f="entfernt">Entfernt</button>
     </div>
     <div class="cat-drawer-grid" id="catDrawerGrid"></div>
     <div class="cat-drawer-nav">
@@ -2596,7 +2619,10 @@
       setSelection(rest, rest.length ? rest[rest.length - 1] : null);
     }
     renderRampList(); renderTrashList(); updateCounts();
-    status('Objekt in den Papierkorb verschoben — Strg+Z oder ↩ im Papierkorb holt es zurück.');
+    if (visitorMode) renderVisitorCatalog();   // Karte bleibt, Zahlen aktualisieren sich
+    status(visitorMode
+      ? 'Rampe aus der Halle genommen — im Katalog unter „Entfernt" liegt sie bereit.'
+      : 'Objekt in den Papierkorb verschoben — Strg+Z oder ↩ im Papierkorb holt es zurück.');
   }
 
   // ── Papierkorb ────────────────────────────────────────
@@ -2614,8 +2640,9 @@
     applyVisibility(r);
     if (!quiet) {
       renderLayerList(); renderRampList(); renderTrashList(); updateCounts();
+      if (visitorMode) renderVisitorCatalog();
       selectRamp(r.id);
-      status('„' + r.name + '“ wiederhergestellt.');
+      status('„' + r.name + '“ zurückgelegt.');
     }
     return true;
   }
@@ -2976,6 +3003,7 @@
   // Zuordnung über r.visCid — überlebt Drehen/Verschieben, anders als ein Geometrie-Vergleich.
   function setCatMark(cid) {
     catMarkCid = (catMarkCid === cid) ? null : cid;
+    if (tut && catMarkCid) tutNotify('catmark', cid);
     applySelectionVisuals();
     // Nur die Karten-Markierung umschalten statt das Grid neu zu bauen — ein
     // Neuaufbau würde die gestaffelte Einblend-Animation bei jedem Klick neu starten.
@@ -4698,9 +4726,9 @@
   var CAT_THRESHOLD = 2.5;  // Distanz (in Standardabweichungen), ab der nichts mehr passt
 
   // → { rampId: Kategoriename } oder null, wenn es keine Referenzmenge gibt
-  function categorizeMovables() {
+  function categorizeMovables(movableList) {
     var pinned = ramps.filter(function (r) { return isPinned(r); });
-    var movable = ramps.filter(function (r) { return !isPinned(r); });
+    var movable = movableList || ramps.filter(function (r) { return !isPinned(r); });
     if (!pinned.length || !movable.length) return null;
 
     var refs = pinned.map(function (r) {
@@ -4748,6 +4776,26 @@
     return out;
   }
 
+  // Wie viele Exemplare eines Katalogeintrags stehen gerade in der Halle,
+  // wie viele wurden herausgenommen? Wird bei jedem Rendern frisch gezählt,
+  // damit die Karte nach Entfernen/Zurücklegen sofort stimmt.
+  function catPlacedCount(cid) {
+    return ramps.filter(function (r) { return r.visCid === cid; }).length;
+  }
+  function catRemovedCount(cid) {
+    return trash.filter(function (t) { return t.ramp.visCid === cid; }).length;
+  }
+
+  // Zuletzt entferntes Exemplar dieses Typs zurück an seine alte Stelle holen.
+  // Es wird NICHTS neu erzeugt — nur ein vorhandenes Objekt wieder eingefügt.
+  function restoreFromCatalog(cid) {
+    var candidates = trash.filter(function (t) { return t.ramp.visCid === cid; });
+    if (!candidates.length) { status('Von diesem Typ ist nichts entfernt.'); return; }
+    candidates.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+    restoreTrashed(candidates[0]);
+    renderVisitorCatalog();
+  }
+
   // Typischster Vertreter einer Gruppe = mittleres Bounding-Box-Volumen.
   // Sein Bild steht stellvertretend auf der Katalogkarte.
   function representativeOf(list) {
@@ -4766,12 +4814,16 @@
     catalog.length = 0;
     catMarkCid = null;   // alte Markierung zeigt sonst auf einen weggeworfenen Eintrag
 
-    var movable = ramps.filter(function (r) { return !isPinned(r); });
+    // Entfernte Rampen liegen im Papierkorb, gehören aber weiter zum Bestand der
+    // Halle — sie kommen mit in den Katalog, damit ihre Karte bestehen bleibt.
+    var movable = ramps.filter(function (r) { return !isPinned(r); })
+      .concat(trash.map(function (t) { return t.ramp; })
+                   .filter(function (r) { return !isPinned(r); }));
 
     // Mit gepinnter Referenzmenge wird nach ÄHNLICHKEIT gruppiert, sonst wie
     // bisher nach exakt gleicher Form (bei ungepinnter Halle gibt es keine
     // Kategorien — und exakte Formgleichheit liefert dann sehr viele Einzelstücke).
-    var cats = categorizeMovables();
+    var cats = categorizeMovables(movable);
     var groups = [], byKey = {};
     movable.forEach(function (r) {
       var key = cats ? (cats[r.id] || 'Sonstige') : visGeoSig(r);
@@ -4886,17 +4938,25 @@
   // ── Katalog-Galerie (ausklappbarer Drawer am linken Bildschirmrand) ──
   var CAT_PAGE_SIZE = 6;
   var catPage = 0;
+  var catFilter = 'alle';   // 'alle' | 'platziert' | 'entfernt'
 
   function renderVisitorCatalog() {
     var cntLbl = document.getElementById('catDrawerCount');
     if (cntLbl) cntLbl.textContent = catalog.length ? '(' + catalog.length + ')' : '';
     if (leftPanel !== 'catalog') return;   // teuer (rendert 3D-Vorschauen) — nur bei geöffnetem Drawer aufbauen
 
-    var totalPages = Math.max(1, Math.ceil(catalog.length / CAT_PAGE_SIZE));
+    // Filter: Alle / nur in der Halle stehende / nur herausgenommene Typen
+    var sichtbar = catalog.filter(function (c) {
+      if (catFilter === 'platziert') return catPlacedCount(c.cid) > 0;
+      if (catFilter === 'entfernt') return catRemovedCount(c.cid) > 0;
+      return true;
+    });
+
+    var totalPages = Math.max(1, Math.ceil(sichtbar.length / CAT_PAGE_SIZE));
     if (catPage >= totalPages) catPage = totalPages - 1;
     if (catPage < 0) catPage = 0;
     var lblEl = document.getElementById('catPageLbl');
-    if (lblEl) lblEl.textContent = (catalog.length ? (catPage + 1) : 0) + ' / ' + totalPages;
+    if (lblEl) lblEl.textContent = (sichtbar.length ? (catPage + 1) : 0) + ' / ' + totalPages;
     var prevBtn = document.getElementById('catPagePrev'), nextBtn = document.getElementById('catPageNext');
     if (prevBtn) prevBtn.disabled = catPage <= 0;
     if (nextBtn) nextBtn.disabled = catPage >= totalPages - 1;
@@ -4909,8 +4969,15 @@
         'Der Betreiber legt fest, was beweglich ist (alles Ungepinnte).</div>';
       return;
     }
+    if (!sichtbar.length) {
+      grid.innerHTML = '<div class="v-empty" style="grid-column:1/-1">' +
+        (catFilter === 'entfernt'
+          ? 'Du hast noch keine Rampe aus der Halle genommen.'
+          : 'Kein Rampentyp steht gerade in der Halle.') + '</div>';
+      return;
+    }
     var start = catPage * CAT_PAGE_SIZE;
-    catalog.slice(start, start + CAT_PAGE_SIZE).forEach(function (c, i) {
+    sichtbar.slice(start, start + CAT_PAGE_SIZE).forEach(function (c, i) {
       var col = hex(c.visColor != null ? c.visColor : c.color);
       if (!c.thumb) c.thumb = renderRampThumb(c.geo, c.visColor != null ? c.visColor : c.color);
 
@@ -4937,8 +5004,10 @@
       nm.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') nm.blur(); ev.stopPropagation(); });
       nm.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
       nm.title = c.name;
+      var drin = catPlacedCount(c.cid), raus = catRemovedCount(c.cid);
+      if (!drin) card.classList.add('leer');
       var cnt = document.createElement('div'); cnt.className = 'cat-card-count';
-      cnt.textContent = (c.visCount > 1 ? c.visCount + '× in der Halle' : '1× in der Halle');
+      cnt.textContent = drin ? (drin + '× in der Halle') : 'nicht in der Halle';
 
       // Maße aus der Katalog-Geometrie — die eigentliche Sachinformation der Karte
       var dims = document.createElement('div'); dims.className = 'cat-card-dims';
@@ -4949,13 +5018,18 @@
                        ' · H ' + Math.round(cbb.max.y - cbb.min.y) + ' cm';
       var hint = document.createElement('div'); hint.className = 'cat-card-hint';
       hint.textContent = 'Klick = in der Halle zeigen';
+      var gone = document.createElement('div'); gone.className = 'cat-card-gone';
+      gone.textContent = raus ? (raus + '× herausgenommen') : '';
 
-      var add = document.createElement('button'); add.className = 'cat-card-add';
-      add.textContent = (visArmedCid === c.cid ? 'Klicke …' : 'Platzieren');
-      add.addEventListener('click', function () {
-        if (visArmedCid === c.cid) { cancelPlacement(); return; }
-        armPlacement(c);
-        toggleCatalogDrawer(false);   // Drawer weg, damit der ganze 3D-Bereich für den Klick frei ist
+      // Es werden bewusst KEINE neuen Rampen erzeugt — der Besucher arbeitet nur
+      // mit dem vorhandenen Bestand. Der Button holt ein herausgenommenes
+      // Exemplar an seine alte Stelle zurück.
+      var add = document.createElement('button'); add.className = 'cat-card-back';
+      add.textContent = raus ? ('↩ Zurücklegen (' + raus + ')') : 'Alle in der Halle';
+      add.disabled = !raus;
+      add.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        restoreFromCatalog(c.cid);
       });
 
       card.dataset.cid = c.cid;
@@ -4968,6 +5042,7 @@
       cnt.title = 'In den Ansichten markieren';
 
       card.appendChild(thumb); card.appendChild(nm); card.appendChild(cnt);
+      if (raus) card.appendChild(gone);
       card.appendChild(dims); card.appendChild(hint); card.appendChild(add);
       grid.appendChild(card);
     });
@@ -4982,6 +5057,20 @@
     if (prev) prev.addEventListener('click', function () { catPage--; renderVisitorCatalog(); });
     var next = document.getElementById('catPageNext');
     if (next) next.addEventListener('click', function () { catPage++; renderVisitorCatalog(); });
+
+    var fil = document.getElementById('catFilter');
+    if (fil) {
+      Array.prototype.forEach.call(fil.querySelectorAll('button'), function (b) {
+        b.addEventListener('click', function () {
+          catFilter = b.dataset.f;
+          Array.prototype.forEach.call(fil.querySelectorAll('button'), function (x) {
+            x.classList.toggle('active', x === b);
+          });
+          catPage = 0;
+          renderVisitorCatalog();
+        });
+      });
+    }
 
     var menuTab = document.getElementById('menuDrawerTab');
     if (menuTab) menuTab.addEventListener('click', function () { toggleMenuDrawer(); });
@@ -5456,9 +5545,9 @@
            + (touch ? '' : ' Mit WASD oder den Pfeiltasten geht es ebenfalls.'),
         ev: 'move', ok: 'Verschoben — so baust du die Halle Stück für Stück um.' },
 
-      { task: 'Leg eine neue Rampe dazu: Reiter 📚 Katalog öffnen und platzieren.',
-        why: 'Im Katalog liegt jeder bewegliche Rampentyp einmal bereit. „Platzieren“ antippen und danach in die Fläche tippen — die Kopie landet genau dort.',
-        ev: 'stamp', ok: 'Die neue Rampe steht in der Halle.' },
+      { task: 'Öffne den Reiter 📚 Katalog und tippe auf ein Rampenbild.',
+        why: 'Der Katalog ist der Bestand der Halle — neue Rampen kommen nicht dazu. Ein Tipp aufs Bild lässt alle Exemplare dieses Typs aufleuchten. Nimmst du eine Rampe heraus, bleibt ihre Karte unter „Entfernt“ stehen und du kannst sie zurücklegen.',
+        ev: 'catmark', ok: 'So findest du jeden Rampentyp in der Halle wieder.' },
 
       { task: 'Fertig — jetzt bist du dran!',
         why: 'Dein Entwurf lässt sich über ☰ Menü → 💾 „Entwurf als JSON speichern“ sichern. Verklickt? Mit ↶ geht jeder Schritt zurück. Das Tutorial startest du jederzeit erneut über ☰ Menü → Hilfe.',

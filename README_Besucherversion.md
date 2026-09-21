@@ -141,10 +141,31 @@ passiert dreierlei:
 3. Jeder bewegliche Rampen*typ* bekommt eine **eigene Signalfarbe**; Kopien
    erben die Farbe ihrer Vorlage.
 
-Der Besucher hat dann nur noch: **Katalog** (Rampen nachlegen per Klick in die
-Fläche), **Verschieben / Drehen / Entfernen** der farbigen Rampen und den
-**JSON-Export**. Feste Elemente lassen sich weder bewegen noch löschen. Über
-`← Betreibermodus` geht es zurück; die Layerfarben kehren dabei zurück.
+Der Besucher hat dann nur noch: **Katalog** (Bestandsliste der Halle),
+**Verschieben / Drehen / Entfernen** der farbigen Rampen und den **JSON-Export**.
+Feste Elemente lassen sich weder bewegen noch löschen. Über `← Betreibermodus`
+geht es zurück; die Layerfarben kehren dabei zurück.
+
+> **Der Besucher legt keine neuen Rampen an.** Er arbeitet ausschließlich mit
+> dem vorhandenen Bestand der Halle — das Stempeln von Kopien gibt es nur im
+> Betreibermodus (Panel *📚 Katalog*).
+
+### Der Katalog als Bestandsliste
+
+Der Katalog zeigt jeden beweglichen Rampentyp der Halle — **auch dann, wenn
+gerade kein Exemplar davon aufgestellt ist**. Entfernt der Besucher eine Rampe,
+wandert sie in den Papierkorb, bleibt aber Teil des Bestands: ihre Karte bleibt
+stehen und zeigt „*n*× herausgenommen".
+
+| Element der Karte | Bedeutung |
+|---|---|
+| „9× in der Halle" | so viele Exemplare stehen gerade im Entwurf |
+| „3× herausgenommen" | so viele liegen im Papierkorb bereit |
+| **↩ Zurücklegen (3)** | holt das zuletzt entfernte Exemplar an seine alte Stelle zurück |
+| ausgegraute Karte | von diesem Typ steht gerade nichts in der Halle |
+
+Über der Kartenliste filtert eine Leiste den Bestand: **Alle · In der Halle ·
+Entfernt**. So sieht man auf einen Blick, was man beiseitegelegt hat.
 
 ### Tutorial
 
