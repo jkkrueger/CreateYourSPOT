@@ -442,7 +442,10 @@
   .cat-drawer-head button:hover { color: var(--danger); }
   .cat-drawer-grid {
     flex: 1; overflow-y: auto; padding: 16px; display: grid;
-    grid-template-columns: repeat(3, 1fr); grid-auto-rows: 1fr; gap: 14px; align-content: start;
+    /* auto-fill statt fester 3 Spalten: der Drawer ist per Anfasser breiten-verstellbar,
+       das Raster folgt der Breite von selbst (1-n Spalten) statt zu quetschen. */
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-auto-rows: 1fr; gap: 14px; align-content: start;
   }
   .cat-card {
     display: flex; flex-direction: column; background: var(--panel-2); border: 1px solid var(--line);
@@ -621,6 +624,66 @@
     0%, 100% { box-shadow: 0 0 0 0 rgba(232,163,61,.35); }
     50%      { box-shadow: 0 0 0 6px rgba(232,163,61,0); }
   }
+
+  /* ══════════════════════════════════════════════════════════════════
+     Breiten-Anfasser an den Besucher-Drawern (Menü / Katalog)
+     ══════════════════════════════════════════════════════════════════ */
+  .drawer-resize {
+    position: absolute; right: 0; top: 0; bottom: 0; width: 14px; z-index: 6;
+    cursor: ew-resize; touch-action: none; background: transparent;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .drawer-resize::before {
+    content: ''; width: 3px; height: 44px; border-radius: 2px; background: var(--line);
+    transition: background .15s var(--ease-snap), height .15s var(--ease-snap);
+  }
+  .drawer-resize:hover::before, .drawer-resize.dragging::before {
+    background: var(--accent); height: 86px;
+  }
+  body.drawer-resizing { cursor: ew-resize; user-select: none; }
+  body.drawer-resizing #edgeTabs { transition: none; }
+
+  /* ══════════════════════════════════════════════════════════════════
+     Tutorial (Besuchermodus)
+     ══════════════════════════════════════════════════════════════════ */
+  .tut-coach {
+    position: fixed; left: 50%; bottom: 20px; z-index: 34;
+    width: min(540px, calc(100vw - 28px));
+    transform: translateX(-50%) translateY(130%); opacity: 0; pointer-events: none;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: 0 18px 46px rgba(0,0,0,.55);
+    transition: transform .3s var(--ease-smooth), opacity .3s var(--ease-smooth);
+  }
+  .tut-coach.show { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
+  .tut-head {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 14px;
+    border-bottom: 1px solid var(--line); background: var(--panel-2); border-radius: 13px 13px 0 0;
+  }
+  .tut-no { font-size: 11px; font-weight: 700; color: var(--accent); letter-spacing: .05em; }
+  .tut-dots { display: flex; gap: 5px; margin-left: auto; }
+  .tut-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); transition: background .2s, transform .2s; }
+  .tut-dot.done { background: var(--accent-2); }
+  .tut-dot.cur { background: var(--accent); transform: scale(1.3); }
+  .tut-head button {
+    background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px;
+    padding: 2px 4px; border-radius: 5px;
+  }
+  .tut-head button:hover { color: var(--danger); }
+  .tut-body { padding: 12px 14px 14px; }
+  .tut-task { font-size: 14px; font-weight: 600; margin: 0 0 6px; line-height: 1.4; }
+  .tut-why { font-size: 11.5px; color: var(--muted); line-height: 1.55; margin: 0; }
+  .tut-ok {
+    display: none; align-items: center; gap: 8px; margin-top: 10px;
+    color: var(--accent-2); font-size: 12.5px; font-weight: 600;
+  }
+  .tut-coach.solved .tut-ok { display: flex; animation: pop-in .3s var(--ease-spring); }
+  .tut-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .tut-actions .v-btn { flex: 1; margin: 0; text-align: center; }
+  #tutModal .modal-box { width: min(420px, calc(100vw - 32px)); }
+
+  /* Katalog-Markierung: angeklickte Karte + zugehörige Rampen in der Szene */
+  .cat-card.marked { border-color: var(--accent-2); box-shadow: 0 0 0 2px rgba(123,196,127,.3); }
+  .cat-card-thumb { cursor: pointer; }
 
   /* ══════════════════════════════════════════════════════════════════
      MOBIL-LAYOUT (Handy / schmale Bildschirme)
@@ -945,6 +1008,13 @@
     </div>
 
     <div class="v-sect">
+      <h3>Hilfe</h3>
+      <button class="v-btn" id="vTutorial">🎓 Tutorial starten</button>
+      <p class="v-hint">Führt dich in sechs Schritten durch die Bedienung — du machst jeden
+        Schritt selbst mit.</p>
+    </div>
+
+    <div class="v-sect">
       <h3>Fertig?</h3>
       <button class="v-btn primary" id="vExportJson">💾 Entwurf als JSON speichern</button>
       <p class="v-hint">Die Datei enthält deine komplette Anordnung und kann in Grasshopper
@@ -1092,6 +1162,43 @@
   </div>
 </div>
 
+<!-- ══════════ Tutorial: Startabfrage + Schritt-Karte ══════════ -->
+<div id="tutModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="popup-head">
+      <span>🛹 Willkommen in deiner Halle</span>
+      <button id="tutModalClose" title="Schließen">✕</button>
+    </div>
+    <div class="popup-body">
+      <p class="hint" style="margin-top:0">Hier darfst du die Skatehalle selbst umbauen:
+        Rampen verschieben, drehen und neue dazulegen.</p>
+      <p class="hint"><b>Soll ich dir kurz zeigen, wie das geht?</b> Sechs kleine Schritte,
+        die du selbst mitmachst — dauert keine zwei Minuten.</p>
+      <div class="modal-actions">
+        <button class="btn" id="tutNo">Nein, direkt loslegen</button>
+        <button class="btn primary" id="tutYes">Ja, zeig es mir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tutCoach" class="tut-coach">
+  <div class="tut-head">
+    <span class="tut-no" id="tutStepNo">Schritt 1</span>
+    <div class="tut-dots" id="tutDots"></div>
+    <button id="tutClose" title="Tutorial beenden">✕</button>
+  </div>
+  <div class="tut-body">
+    <p class="tut-task" id="tutTask"></p>
+    <p class="tut-why" id="tutWhy"></p>
+    <div class="tut-ok"><span>✅</span><span id="tutOkText"></span></div>
+    <div class="tut-actions">
+      <button class="v-btn" id="tutSkip">Überspringen</button>
+      <button class="v-btn primary" id="tutNext">Weiter</button>
+    </div>
+  </div>
+</div>
+
 <script src="vendor/three.min.js"></script>
 <script>
   // Fallback: liegt die Datei ohne vendor/-Ordner, Bibliotheken vom CDN laden
@@ -1184,6 +1291,7 @@
   var VIS_PALETTE = [0xe8a33d, 0x5aa9e6, 0x7bc47f, 0xe8688f, 0xf2d75c,
                      0xa885e8, 0xff8a5c, 0x4ecdc4, 0xc9d94f, 0xef6ec9];
   var visCatalogBuilt = false;   // Katalog nur beim ersten Wechsel automatisch füllen
+  var catMarkCid = null;         // angeklickter Katalogeintrag → dessen Rampen leuchten in der Szene
   var visArmedCid = null;        // Katalogeintrag wartet auf Klick-Platzierung
 
   // Rückkehr-PIN: rein im Arbeitsspeicher — nach Server-/Seiten-Neustart automatisch wieder leer.
@@ -1428,6 +1536,14 @@
     });
     updatePaneOverlays(aps);
     updateMeasureVisuals(aps);
+    // Sanfter Puls für die im Katalog markierten Rampen — macht sie auch in
+    // einer vollen Halle sofort auffindbar.
+    if (catMarkCid) {
+      var k = 0.28 + 0.22 * Math.sin(performance.now() / 260);
+      ramps.forEach(function (r) {
+        if (r.visCid === catMarkCid && selIds.indexOf(r.id) === -1) r.mesh.material.emissiveIntensity = k;
+      });
+    }
   }
 
   // ── Achsen-Gizmo (Pfeile pro Achse) ───────────────────
@@ -2281,6 +2397,7 @@
               pinned: false, hidden: false, lock: { x: false, y: false, z: false } };
     // Kopien erben die Signalfarbe ihrer Vorlage → gleicher Typ = gleiche Farbe
     if (entry.visColor != null) r.visColor = entry.visColor;
+    r.visCid = entry.cid;
     applyLayerColor(r);
     ramps.push(r);
     pushUndo({ kind: 'create', ramp: r, index: ramps.length - 1 });
@@ -2290,6 +2407,7 @@
     if (!inView(r)) focusObject(r);   // Kamera nachführen, falls die Kopie außerhalb des Bildes liegt
     status('„' + entry.name + '" platziert (' + modeLbl +
       ') bei ' + Math.round(pos.x) + ' · ' + Math.round(pos.y) + ' · ' + Math.round(pos.z) + ' cm.');
+    if (tut) tutNotify('stamp', entry);
   }
 
   // Klickmodus: Eintrag scharf schalten, nächster Klick in die Fläche platziert
@@ -2716,9 +2834,40 @@
     ramps.forEach(function (r) {
       var on = selIds.indexOf(r.id) !== -1;
       r.mesh.material.emissive = r.mesh.material.emissive || new THREE.Color(0);
-      r.mesh.material.emissive.setHex(on ? (r.id === selectedId ? 0xff5c38 : 0xc77a30) : 0x000000);
-      r.mesh.material.emissiveIntensity = on ? 0.35 : 0;
+      if (on) {
+        r.mesh.material.emissive.setHex(r.id === selectedId ? 0xff5c38 : 0xc77a30);
+        r.mesh.material.emissiveIntensity = 0.35;
+      } else if (catMarkCid && r.visCid === catMarkCid) {
+        // Im Katalog angeklickt: alle Rampen dieses Typs leuchten auf (Puls in animate()).
+        r.mesh.material.emissive.setHex(0xffffff);
+        r.mesh.material.emissiveIntensity = 0.4;
+      } else {
+        r.mesh.material.emissive.setHex(0x000000);
+        r.mesh.material.emissiveIntensity = 0;
+      }
     });
+  }
+
+  // Rampen eines Katalogeintrags in allen Ansichten markieren (Klick auf die Karte).
+  // Zuordnung über r.visCid — überlebt Drehen/Verschieben, anders als ein Geometrie-Vergleich.
+  function setCatMark(cid) {
+    catMarkCid = (catMarkCid === cid) ? null : cid;
+    applySelectionVisuals();
+    // Nur die Karten-Markierung umschalten statt das Grid neu zu bauen — ein
+    // Neuaufbau würde die gestaffelte Einblend-Animation bei jedem Klick neu starten.
+    Array.prototype.forEach.call(document.querySelectorAll('#catDrawerGrid .cat-card'), function (el) {
+      el.classList.toggle('marked', !!catMarkCid && el.dataset.cid === catMarkCid);
+    });
+    if (!catMarkCid) { status('Markierung aufgehoben.'); return; }
+    var hits = ramps.filter(function (r) { return r.visCid === catMarkCid; });
+    var entry = catalog.filter(function (c) { return c.cid === catMarkCid; })[0];
+    status(hits.length + '× „' + (entry ? entry.name : 'Rampe') + '" in der Halle markiert' +
+      (hits.length ? ' — leuchtet weiß auf.' : '.'));
+  }
+  function clearCatMark() {
+    if (!catMarkCid) return;
+    catMarkCid = null;
+    applySelectionVisuals();
   }
   function setSelection(ids, primary, openPopup) {
     selIds = ids.filter(function (id) { return findRamp(id); });
@@ -2741,6 +2890,7 @@
     if (selIds.length > 1) {
       status(selIds.length + ' Objekte ausgewählt — Pfeil ziehen oder WASD verschiebt die ganze Gruppe.');
     }
+    if (tut && selectedId) tutNotify('select', selectedId);
   }
   function selectRamp(id, openPopup) { setSelection(id ? [id] : [], id, openPopup); }
   function toggleSelect(id) {
@@ -3004,6 +3154,7 @@
       var cam = activePanes()[orbit.paneIdx] ? activePanes()[orbit.paneIdx].camera : panes[0].camera;
       var dx = e.clientX - orbit.lastX, dy = e.clientY - orbit.lastY;
       orbit.lastX = e.clientX; orbit.lastY = e.clientY;
+      if (dx || dy) orbit.moved = true;   // bloßes Antippen zählt nicht als "Ansicht gedreht"
       var t = cam.userData.target;
       if (orbit.type === 'rotate' && cam.isPerspectiveCamera) {
         var off = cam.position.clone().sub(t);
@@ -3030,7 +3181,11 @@
       }
     });
     dom.addEventListener('pointerup', function (e) {
-      if (orbit) { orbit = null; dom.releasePointerCapture(e.pointerId); }
+      if (orbit) {
+        var orbitMoved = orbit.moved;
+        orbit = null; dom.releasePointerCapture(e.pointerId);
+        if (tut && orbitMoved) tutNotify('orbit');
+      }
     });
     dom.addEventListener('wheel', function (e) {
       var hp = paneAt(e.clientX, e.clientY);
@@ -3508,6 +3663,13 @@
       entries.push({ kind: 'transform', id: s0.id, before: b, after: after, mergeKey: null, t: Date.now() });
     });
     if (!entries.length) return;
+    if (tut) {
+      var tutMoved = entries.some(function (te) {
+        return te.before.x !== te.after.x || te.before.y !== te.after.y || te.before.z !== te.after.z;
+      });
+      if (tutMoved) tutNotify('move', entries[0].id);
+      else tutNotify('rotate', entries[0].id);
+    }
     if (entries.length === 1) {
       // Einzelobjekt: normales Verhalten inkl. Zusammenfassen schneller Schritte
       var e1 = entries[0];
@@ -4326,6 +4488,7 @@
   function buildVisitorCatalog() {
     catalog.forEach(function (c) { try { c.geo.dispose(); } catch (e) {} });
     catalog.length = 0;
+    catMarkCid = null;   // alte Markierung zeigt sonst auf einen weggeworfenen Eintrag
 
     var movable = ramps.filter(function (r) { return !isPinned(r); });
     var bySig = {}, order = [];
@@ -4344,6 +4507,8 @@
       var entry = catalog[catalog.length - 1];
       entry.visColor = col;
       entry.visCount = grp.list.length;
+      // Rückverweis Rampe → Katalogeintrag (für Markierung und Tutorial)
+      grp.list.forEach(function (r) { r.visCid = entry.cid; });
     });
 
     updateCatCount();
@@ -4493,6 +4658,15 @@
         toggleCatalogDrawer(false);   // Drawer weg, damit der ganze 3D-Bereich für den Klick frei ist
       });
 
+      card.dataset.cid = c.cid;
+      if (catMarkCid === c.cid) card.classList.add('marked');
+      // Klick auf Bild/Zähler markiert den Typ in den Ansichten (Name + Platzieren
+      // haben ihre eigene Funktion und stoppen den Klick selbst).
+      thumb.addEventListener('click', function () { setCatMark(c.cid); });
+      cnt.addEventListener('click', function () { setCatMark(c.cid); });
+      cnt.style.cursor = 'pointer';
+      cnt.title = 'In den Ansichten markieren';
+
       card.appendChild(thumb); card.appendChild(nm); card.appendChild(cnt); card.appendChild(add);
       grid.appendChild(card);
     });
@@ -4605,8 +4779,11 @@
       status(n
         ? 'Besuchermodus — ' + n + ' bewegliche Rampentyp(en) im Katalog. Graue Elemente stehen fest.'
         : 'Besuchermodus — es sind keine beweglichen Rampen vorhanden (alles gepinnt?).');
+      tutMaybeOffer();
     } else {
       cancelPlacement();
+      tutEnd(false);                 // Tutorial gehört zum Besuchermodus
+      clearCatMark();
       applyVisitorColors();          // zurück auf Layerfarben
       catalog.forEach(function (c) { c.color = colorOf(c.layerKey); });
       renderCatalogList(); renderRampList(); renderLayerList();
@@ -4705,6 +4882,207 @@
     var f = byId('vFit'); if (f) f.addEventListener('click', fitView);
   }
 
+  // ═════════════════════════════════════════════════════════════════
+  //  Breiten-Anfasser: Menü- und Katalog-Drawer horizontal ziehen.
+  //  Beide liegen am linken Rand; die Reiter-Leiste hängt an ihrer Außenkante
+  //  und muss beim Ziehen live mitwandern.
+  // ═════════════════════════════════════════════════════════════════
+  var DRAWER_MIN = 240;
+  function drawerMax() { return Math.max(DRAWER_MIN, Math.min(window.innerWidth - 56, 1100)); }
+
+  function syncEdgeTabs() {
+    var tabs = document.getElementById('edgeTabs');
+    if (!tabs) return;
+    var openEl = document.querySelector('#visitorUI.open, #catDrawer.open');
+    tabs.style.left = (openEl ? openEl.offsetWidth : 0) + 'px';
+  }
+
+  function setDrawerWidth(el, w, key) {
+    w = Math.max(DRAWER_MIN, Math.min(w, drawerMax()));
+    el.style.width = w + 'px';
+    if (key) { try { localStorage.setItem(key, String(Math.round(w))); } catch (e) {} }
+    syncEdgeTabs();
+  }
+
+  function initDrawerResize() {
+    [{ id: 'visitorUI', key: 'sk_w_menu' }, { id: 'catDrawer', key: 'sk_w_cat' }].forEach(function (cfg) {
+      var el = document.getElementById(cfg.id);
+      if (!el) return;
+
+      var saved = NaN;
+      try { saved = parseInt(localStorage.getItem(cfg.key) || '', 10); } catch (e) {}
+      if (saved && !isNaN(saved)) el.style.width = Math.max(DRAWER_MIN, Math.min(saved, drawerMax())) + 'px';
+
+      var grip = document.createElement('div');
+      grip.className = 'drawer-resize';
+      grip.title = 'Breite ziehen · Doppelklick setzt zurück';
+      el.appendChild(grip);
+
+      grip.addEventListener('pointerdown', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var startX = e.clientX, startW = el.offsetWidth;
+        try { grip.setPointerCapture(e.pointerId); } catch (e2) {}
+        grip.classList.add('dragging');
+        document.body.classList.add('drawer-resizing');
+
+        function onMove(ev) { setDrawerWidth(el, startW + (ev.clientX - startX), null); }
+        function onUp() {
+          grip.removeEventListener('pointermove', onMove);
+          grip.removeEventListener('pointerup', onUp);
+          grip.removeEventListener('pointercancel', onUp);
+          grip.classList.remove('dragging');
+          document.body.classList.remove('drawer-resizing');
+          setDrawerWidth(el, el.offsetWidth, cfg.key);   // Endbreite merken
+        }
+        grip.addEventListener('pointermove', onMove);
+        grip.addEventListener('pointerup', onUp);
+        grip.addEventListener('pointercancel', onUp);
+      });
+
+      grip.addEventListener('dblclick', function (e) {
+        e.stopPropagation();
+        el.style.width = '';
+        try { localStorage.removeItem(cfg.key); } catch (e2) {}
+        syncEdgeTabs();
+        status('Breite auf Standard zurückgesetzt.');
+      });
+    });
+  }
+
+  // ═════════════════════════════════════════════════════════════════
+  //  Tutorial (Besuchermodus) — der Besucher klickt sich aktiv durch.
+  //  Jeder Schritt wird durch eine echte Aktion gelöst; tutNotify() wird an den
+  //  vier Stellen gerufen, an denen diese Aktionen tatsächlich passieren.
+  // ═════════════════════════════════════════════════════════════════
+  var tut = null;   // { i, steps, solved }
+
+  function tutCoarse() { return window.matchMedia('(pointer: coarse)').matches; }
+
+  // Häufigster beweglicher Rampentyp als Suchziel — den findet man am ehesten wieder.
+  function tutPickTarget() {
+    var best = null;
+    catalog.forEach(function (c) {
+      if (!best || (c.visCount || 1) > (best.visCount || 1)) best = c;
+    });
+    return best ? { cid: best.cid, name: best.name, count: best.visCount || 1 } : null;
+  }
+
+  function tutSteps(t) {
+    var touch = tutCoarse();
+    return [
+      { task: 'Schau dich zuerst um — dreh die Halle einmal.',
+        why: touch
+          ? 'Einen Finger über die Fläche ziehen dreht die Ansicht. Zwei Finger: auf- und zuziehen zoomt, gemeinsam schieben verschiebt.'
+          : 'Rechte Maustaste halten und ziehen dreht die Ansicht, das Mausrad zoomt, die mittlere Taste schiebt.',
+        ev: 'orbit', ok: 'Genau so bewegst du dich durch die Halle.' },
+
+      { task: 'Grau steht fest — farbig gehört dir.',
+        why: 'Wände und fest verbaute Elemente sind einheitlich grau und lassen sich nicht bewegen. Alles Farbige darfst du verschieben, drehen, entfernen und nachlegen.',
+        manual: true },
+
+      { task: 'Such die Rampe „' + t.name + '“ und wähl sie aus.',
+        why: 'Von diesem Typ steht ' + t.count + '× in der Halle — alle in derselben Farbe. '
+           + (touch ? 'Am Handy wählst du mit einem Doppel-Tipp aus.' : 'Ein Klick darauf genügt.')
+           + ' Tipp: Im Katalog 📚 auf das Bild einer Rampe tippen lässt alle Exemplare in der Halle aufleuchten.',
+        ev: 'select',
+        test: function (id) { var r = findRamp(id); return !!r && !isPinned(r) && r.visCid === t.cid; },
+        ok: 'Gefunden! Die farbigen Pfeile daran sind jetzt dein Werkzeug.' },
+
+      { task: 'Verschieb diese Rampe an eine freie Stelle.',
+        why: 'An einem der Pfeile ziehen verschiebt sie entlang dieser Achse, am Ring drehst du sie.'
+           + (touch ? '' : ' Mit WASD oder den Pfeiltasten geht es ebenfalls.'),
+        ev: 'move', ok: 'Verschoben — so baust du die Halle Stück für Stück um.' },
+
+      { task: 'Leg eine neue Rampe dazu: Reiter 📚 Katalog öffnen und platzieren.',
+        why: 'Im Katalog liegt jeder bewegliche Rampentyp einmal bereit. „Platzieren“ antippen und danach in die Fläche tippen — die Kopie landet genau dort.',
+        ev: 'stamp', ok: 'Die neue Rampe steht in der Halle.' },
+
+      { task: 'Fertig — jetzt bist du dran!',
+        why: 'Dein Entwurf lässt sich über ☰ Menü → 💾 „Entwurf als JSON speichern“ sichern. Verklickt? Mit ↶ geht jeder Schritt zurück. Das Tutorial startest du jederzeit erneut über ☰ Menü → Hilfe.',
+        manual: true, last: true }
+    ];
+  }
+
+  function tutStart() {
+    var t = tutPickTarget();
+    if (!t) { status('Für das Tutorial braucht es mindestens eine bewegliche Rampe.'); return; }
+    tut = { i: 0, steps: tutSteps(t), solved: false };
+    var c = document.getElementById('tutCoach');
+    if (c) c.classList.add('show');
+    tutRender();
+  }
+
+  function tutEnd(done) {
+    tut = null;
+    var c = document.getElementById('tutCoach');
+    if (c) c.classList.remove('show', 'solved');
+    if (done) status('Tutorial abgeschlossen — viel Spaß beim Umbauen.');
+  }
+
+  function tutRender() {
+    if (!tut) return;
+    var s0 = tut.steps[tut.i];
+    var c = document.getElementById('tutCoach');
+    c.classList.toggle('solved', !!tut.solved);
+    document.getElementById('tutStepNo').textContent = 'Schritt ' + (tut.i + 1) + ' von ' + tut.steps.length;
+    document.getElementById('tutTask').textContent = s0.task;
+    document.getElementById('tutWhy').textContent = s0.why;
+    document.getElementById('tutOkText').textContent = s0.ok || 'Erledigt!';
+
+    var dots = document.getElementById('tutDots');
+    dots.innerHTML = '';
+    tut.steps.forEach(function (_, k) {
+      var d = document.createElement('span');
+      d.className = 'tut-dot' + (k < tut.i ? ' done' : (k === tut.i ? ' cur' : ''));
+      dots.appendChild(d);
+    });
+
+    var frei = !!(s0.manual || tut.solved);
+    var next = document.getElementById('tutNext');
+    next.textContent = s0.last ? 'Tutorial beenden' : 'Weiter';
+    next.style.display = frei ? '' : 'none';
+    document.getElementById('tutSkip').style.display = frei ? 'none' : '';
+  }
+
+  function tutNext() {
+    if (!tut) return;
+    if (tut.steps[tut.i].last) { tutEnd(true); return; }
+    tut.i++; tut.solved = false;
+    tutRender();
+  }
+
+  function tutNotify(ev, data) {
+    if (!tut || tut.solved) return;
+    var s0 = tut.steps[tut.i];
+    if (!s0 || s0.ev !== ev) return;
+    if (s0.test && !s0.test(data)) return;
+    tut.solved = true;
+    tutRender();
+    setTimeout(function () { if (tut && tut.solved) tutNext(); }, 1500);
+  }
+
+  function tutMaybeOffer() {
+    if (!catalog.length) return;              // ohne bewegliche Rampen gibt es nichts zu zeigen
+    var m = document.getElementById('tutModal');
+    if (m) m.classList.add('show');
+  }
+
+  function bindTutorial() {
+    function byId(id) { return document.getElementById(id); }
+    function hideModal() { var m = byId('tutModal'); if (m) m.classList.remove('show'); }
+    var yes = byId('tutYes'); if (yes) yes.addEventListener('click', function () { hideModal(); tutStart(); });
+    var no = byId('tutNo'); if (no) no.addEventListener('click', function () {
+      hideModal(); status('Viel Spaß — das Tutorial findest du jederzeit unter ☰ Menü → Hilfe.');
+    });
+    var cl = byId('tutModalClose'); if (cl) cl.addEventListener('click', hideModal);
+    var nx = byId('tutNext'); if (nx) nx.addEventListener('click', tutNext);
+    var sk = byId('tutSkip'); if (sk) sk.addEventListener('click', tutNext);
+    var xc = byId('tutClose'); if (xc) xc.addEventListener('click', function () { tutEnd(false); });
+    var vt = byId('vTutorial'); if (vt) vt.addEventListener('click', function () {
+      toggleMenuDrawer(false); tutStart();
+    });
+  }
+
   function boot() {
     if (typeof THREE === 'undefined') { status('Three.js nicht geladen — weder vendor/-Ordner neben der Datei noch CDN erreichbar.'); return; }
     try {
@@ -4712,6 +5090,7 @@
       setTimeout(function () { document.body.classList.remove('boot-in'); }, 700);
       initScene(); buildPaneOverlays(); bindUI(); bindVisitorUI(); bindCatalogDrawer(); bindHoverTip(); bindPinModal();
       initPanels(); setLayout(1); renderTrashList();
+      initDrawerResize(); bindTutorial();
       // Über einen Server lädt loadSampleList() gleich die hinterlegte Halle nach und setzt
       // dabei eine eigene Statusmeldung — hier deshalb nur der Fall ohne Server.
       status(window.__fileProtocol

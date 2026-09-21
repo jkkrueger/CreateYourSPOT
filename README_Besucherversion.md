@@ -146,6 +146,34 @@ Fläche), **Verschieben / Drehen / Entfernen** der farbigen Rampen und den
 **JSON-Export**. Feste Elemente lassen sich weder bewegen noch löschen. Über
 `← Betreibermodus` geht es zurück; die Layerfarben kehren dabei zurück.
 
+### Tutorial
+
+Beim Wechsel in den Besuchermodus fragt die App: *Tutorial anschauen?* Sagt der
+Besucher ja, führt eine Karte am unteren Rand durch **sechs Schritte**, die er
+jeweils selbst ausführen muss — der nächste Schritt schaltet erst frei, wenn die
+Aktion wirklich passiert ist:
+
+1. Ansicht drehen
+2. Grau vs. farbig verstehen (Lesen, weiter per Klick)
+3. Eine **namentlich genannte Rampe suchen und auswählen** — der Typ mit den
+   meisten Exemplaren wird automatisch als Suchziel gewählt
+4. Diese Rampe verschieben
+5. Über den Katalog eine Rampe nachlegen
+6. Abschluss mit Hinweis auf Speichern und Rückgängig
+
+Jederzeit neu startbar über *☰ Menü → Hilfe → 🎓 Tutorial starten*, abbrechbar
+über das ✕ der Karte.
+
+### Bedienhilfen
+
+- **Drawer-Breite:** Menü- und Katalog-Fenster haben am rechten Rand einen
+  Anfasser — mit gedrückter Maustaste horizontal ziehen. Die Breite wird pro
+  Browser gemerkt, Doppelklick auf den Anfasser setzt sie zurück. Das
+  Katalog-Raster passt die Spaltenzahl automatisch an.
+- **Rampen finden:** Ein Klick auf das Bild einer Katalogkarte lässt **alle
+  Exemplare dieses Typs** in den Ansichten weiß aufleuchten (pulsierend).
+  Nochmal klicken hebt die Markierung auf.
+
 ---
 
 ## Ordnerinhalt
