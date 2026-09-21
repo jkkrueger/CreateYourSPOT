@@ -705,6 +705,44 @@
 
   /* Katalog-Markierung: angeklickte Karte + zugehörige Rampen in der Szene */
   .cat-card.marked { border-color: var(--accent-2); box-shadow: 0 0 0 2px rgba(123,196,127,.3); }
+
+  /* ── Besucher-Layer (eigene Gruppierung, unabhängig von den Rhino-Layern) ── */
+  .vl-new { display: flex; gap: 6px; margin-bottom: 8px; }
+  .vl-new input {
+    flex: 1; min-width: 0; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 7px; padding: 8px 9px; font-size: 12.5px;
+  }
+  .vl-new input:focus { outline: none; border-color: var(--accent); }
+  .vl-new button {
+    flex: 0 0 auto; width: 38px; cursor: pointer; background: var(--accent); color: #17191d;
+    border: none; border-radius: 7px; font-size: 16px; font-weight: 700;
+  }
+  .vl-row {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 5px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+    transition: border-color .15s var(--ease-snap), background .15s var(--ease-snap);
+  }
+  .vl-row:hover { background: #272c33; border-color: var(--muted); }
+  .vl-row.active { border-color: var(--accent); }
+  .vl-row .vl-name { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vl-row .vl-count {
+    flex: 0 0 auto; font-size: 10.5px; font-weight: 700; color: var(--accent);
+    background: rgba(232,163,61,.14); border-radius: 10px; padding: 2px 7px;
+  }
+  .vl-row .vl-del { flex: 0 0 auto; background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 13px; padding: 2px 4px; border-radius: 5px; }
+  .vl-row .vl-del:hover { color: var(--danger); }
+
+  /* Layer-Auswahl beim Export */
+  .exp-row { display: flex; align-items: center; gap: 9px; padding: 8px 10px; margin-bottom: 5px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+  .exp-row:hover { background: #272c33; }
+  .exp-row input { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+  .exp-row .exp-name { flex: 1; font-size: 12.5px; }
+  .exp-row .exp-count { font-size: 10.5px; color: var(--muted); }
+  #expModal .modal-box { width: min(420px, calc(100vw - 32px)); }
+  #expList { max-height: 46vh; overflow-y: auto; margin: 4px 0 12px; }
   .cat-card-thumb { cursor: pointer; }
 
   /* ══════════════════════════════════════════════════════════════════
@@ -1030,6 +1068,18 @@
     </div>
 
     <div class="v-sect">
+      <h3>Meine Layer</h3>
+      <div class="vl-new">
+        <input type="text" id="vLayerName" placeholder="Neuer Layer …" maxlength="40">
+        <button id="vLayerAdd" title="Layer anlegen">+</button>
+      </div>
+      <div id="vLayerList"></div>
+      <p class="v-hint">Erst eine Rampe auswählen, dann auf einen Layer tippen — sie wird
+        dort einsortiert. Ist sie schon drin, nimmt derselbe Tipp sie wieder heraus.
+        Beim Speichern kannst du gezielt einzelne Layer exportieren.</p>
+    </div>
+
+    <div class="v-sect">
       <h3>Hilfe</h3>
       <button class="v-btn" id="vTutorial">🎓 Tutorial starten</button>
       <p class="v-hint">Führt dich in sechs Schritten durch die Bedienung — du machst jeden
@@ -1200,6 +1250,23 @@
       <div class="modal-actions">
         <button class="btn" id="tutNo">Nein, direkt loslegen</button>
         <button class="btn primary" id="tutYes">Ja, zeig es mir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="expModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="popup-head">
+      <span>💾 Welche Layer exportieren?</span>
+      <button id="expClose" title="Schließen">✕</button>
+    </div>
+    <div class="popup-body">
+      <p class="hint" style="margin-top:0">Nur die angehakten Layer landen im JSON.</p>
+      <div id="expList"></div>
+      <div class="modal-actions">
+        <button class="btn" id="expCancel">Abbrechen</button>
+        <button class="btn primary" id="expOk">Exportieren</button>
       </div>
     </div>
   </div>
@@ -2135,6 +2202,7 @@
     // bestehende Szene leeren
     ramps.forEach(function (r) { scene.remove(r.mesh); r.mesh.geometry.dispose(); r.mesh.material.dispose(); });
     ramps = []; selectedId = null;
+    visLayers.length = 0;   // Besucher-Layer gehoeren zur alten Datei
     // Undo-Historie leeren; von gelöschten Objekten zurückgehaltene Meshes freigeben
     undoStack.concat(redoStack).forEach(disposeIfGone);
     undoStack = []; redoStack = []; updateUndoButtons();
@@ -2953,6 +3021,7 @@
       status(selIds.length + ' Objekte ausgewählt — Pfeil ziehen oder WASD verschiebt die ganze Gruppe.');
     }
     if (tut && selectedId) tutNotify('select', selectedId);
+    if (visitorMode) renderVLayerList();   // markiert den Layer der neuen Auswahl
   }
   function selectRamp(id, openPopup) { setSelection(id ? [id] : [], id, openPopup); }
   function toggleSelect(id) {
@@ -4373,11 +4442,13 @@
     return { units: 'cm', space: 'rhino-world', vertices: verts, faces: faces };
   }
 
-  function exportJson() {
+  // allowRamp (optional): Filter aus der Layer-Auswahl des Besuchermodus
+  function exportJson(allowRamp) {
     if (!ramps.length) { status('Nichts zu exportieren — erst .3dm laden.'); return; }
     var elements = [];
     ramps.forEach(function (r) {
       if (!r.mesh.visible) return;
+      if (allowRamp && !allowRamp(r)) return;
       var geo = r.mesh.geometry;
       if (!geo.boundingBox) geo.computeBoundingBox();
       var bb = geo.boundingBox;
@@ -4393,6 +4464,8 @@
         typeName: r.name,
         group: l ? l.name : 'Unknown',
         layer: l ? (l.fullPath || l.name) : r.layer,
+        // Vom Besucher selbst vergebener Layer (null = keiner)
+        visitorLayer: r.vLayer || null,
         mobile: false,
         estimated: true,
         position: { x: Math.round(r.mesh.position.x), y: Math.round(r.mesh.position.y), z: Math.round(r.mesh.position.z) },
@@ -4562,35 +4635,173 @@
   }
 
   // Alle beweglichen (= ungepinnten) Rampen einfärben und den Katalog daraus füllen
+  // ═════════════════════════════════════════════════════════════════
+  //  Einordnung der beweglichen Rampen nach Ähnlichkeit
+  //
+  //  Die GEPINNTEN Rampen bilden die Referenzmenge: jede von ihnen steht mit
+  //  ihrem Layer (QTRS, BNKS, Rails, …) für eine Kategorie. Jede bewegliche
+  //  Rampe wird der Kategorie der ähnlichsten gepinnten Objekte zugeordnet —
+  //  k-Nearest-Neighbour auf z-standardisierten Formmerkmalen.
+  //
+  //  Warum so: die Kategorien sind durch das Pinnen bereits VORGEGEBEN, das ist
+  //  also ein Zuordnungs- und kein Clusterproblem — k-NN ist dafür das direkte,
+  //  deterministische und nachvollziehbare Verfahren (kein Training, kein
+  //  Zufallsstart wie bei k-Means). Die z-Standardisierung ist nötig, weil die
+  //  Längen in cm sonst jedes Formverhältnis überstimmen würden.
+  // ═════════════════════════════════════════════════════════════════
+
+  // Flächengewichtetes Histogramm der Normalen-Neigung, von waagerecht bis
+  // senkrecht. Nötig, weil die Bounding-Box allein eine gekrümmte Quarterpipe
+  // nicht von einer schrägen Bank trennen kann: beide können gleich groß sein,
+  // verteilen ihre Flächen aber völlig anders über die Neigungen.
+  // (Messung an der echten Halle: bringt rund +9 Prozentpunkte Trefferquote.)
+  var CAT_NBIN = 5;
+  function slopeHistogram(geo) {
+    var hist = [], b;
+    for (b = 0; b < CAT_NBIN; b++) hist.push(0);
+    var pa = geo.getAttribute('position');
+    if (!pa) return hist;
+    // Die Geometrie ist nicht indiziert (siehe geometryFrom) — je 9 Werte ein Dreieck.
+    var a = pa.array, total = 0;
+    for (var i = 0; i + 8 < a.length; i += 9) {
+      var ux = a[i + 3] - a[i], uy = a[i + 4] - a[i + 1], uz = a[i + 5] - a[i + 2];
+      var wx = a[i + 6] - a[i], wy = a[i + 7] - a[i + 1], wz = a[i + 8] - a[i + 2];
+      var nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+      var len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (len < 1e-9) continue;
+      var vert = Math.abs(ny / len);          // 1 = waagerecht, 0 = senkrecht (y = hoch)
+      var bin = Math.floor((1 - vert) * CAT_NBIN);
+      if (bin >= CAT_NBIN) bin = CAT_NBIN - 1;
+      if (bin < 0) bin = 0;
+      hist[bin] += len / 2; total += len / 2;
+    }
+    if (total > 0) for (b = 0; b < CAT_NBIN; b++) hist[b] /= total;
+    return hist;
+  }
+
+  // Merkmalsvektor: Größe logarithmisch (damit VERHÄLTNISSE zählen und nicht
+  // absolute Zentimeter dominieren), zwei Formkennzahlen und das Neigungsprofil.
+  // Gerechnet wird auf der Geometrie-Bounding-Box, also drehungsunabhängig.
+  function rampFeatures(r) {
+    var geo = r.mesh.geometry;
+    if (!geo.boundingBox) geo.computeBoundingBox();
+    var bb = geo.boundingBox;
+    var L = Math.max(bb.max.x - bb.min.x, 1);
+    var H = Math.max(bb.max.y - bb.min.y, 1);
+    var B = Math.max(bb.max.z - bb.min.z, 1);
+    // Das Histogramm ist teuer und ändert sich nie — einmal je Rampe merken.
+    if (!r._slopeHist) r._slopeHist = slopeHistogram(geo);
+    return [Math.log(L), Math.log(B), Math.log(H), H / L, B / L].concat(r._slopeHist);
+  }
+
+  var CAT_K = 3;            // Nachbarn für den Mehrheitsentscheid
+  var CAT_THRESHOLD = 2.5;  // Distanz (in Standardabweichungen), ab der nichts mehr passt
+
+  // → { rampId: Kategoriename } oder null, wenn es keine Referenzmenge gibt
+  function categorizeMovables() {
+    var pinned = ramps.filter(function (r) { return isPinned(r); });
+    var movable = ramps.filter(function (r) { return !isPinned(r); });
+    if (!pinned.length || !movable.length) return null;
+
+    var refs = pinned.map(function (r) {
+      var l = layerByName(r.layer);
+      return { f: rampFeatures(r), cat: (l ? (l.name || l.key) : r.layer) || 'Unbenannt' };
+    });
+
+    // z-Standardisierung anhand der Referenzmenge
+    var dim = refs[0].f.length, mean = [], sd = [];
+    for (var j = 0; j < dim; j++) {
+      var col = refs.map(function (x) { return x.f[j]; });
+      var m = col.reduce(function (a, b) { return a + b; }, 0) / col.length;
+      var varr = col.reduce(function (a, b) { return a + (b - m) * (b - m); }, 0) / col.length;
+      mean.push(m);
+      sd.push(Math.sqrt(varr) || 1);   // konstante Merkmale nicht durch 0 teilen
+    }
+    function norm(f) {
+      var out = [];
+      for (var j = 0; j < f.length; j++) out.push((f[j] - mean[j]) / sd[j]);
+      return out;
+    }
+    var refN = refs.map(function (x) { return { v: norm(x.f), cat: x.cat }; });
+    var K = Math.min(CAT_K, refN.length);
+
+    var out = {};
+    movable.forEach(function (r) {
+      var v = norm(rampFeatures(r));
+      var d = refN.map(function (x) {
+        var sum = 0;
+        for (var j = 0; j < v.length; j++) { var t = v[j] - x.v[j]; sum += t * t; }
+        return { dist: Math.sqrt(sum), cat: x.cat };
+      }).sort(function (a, b) { return a.dist - b.dist; });
+
+      // Nichts hinreichend Ähnliches in der Halle → eigene Sammelkategorie
+      if (d[0].dist > CAT_THRESHOLD) { out[r.id] = 'Sonstige'; return; }
+
+      // Mehrheitsentscheid der k nächsten, gewichtet mit 1/Distanz
+      var score = {}, best = null;
+      d.slice(0, K).forEach(function (x) {
+        score[x.cat] = (score[x.cat] || 0) + 1 / (x.dist + 0.001);
+      });
+      Object.keys(score).forEach(function (c) { if (best === null || score[c] > score[best]) best = c; });
+      out[r.id] = best;
+    });
+    return out;
+  }
+
+  // Typischster Vertreter einer Gruppe = mittleres Bounding-Box-Volumen.
+  // Sein Bild steht stellvertretend auf der Katalogkarte.
+  function representativeOf(list) {
+    if (list.length < 3) return list[0];
+    var withVol = list.map(function (r) {
+      var geo = r.mesh.geometry;
+      if (!geo.boundingBox) geo.computeBoundingBox();
+      var bb = geo.boundingBox;
+      return { r: r, v: (bb.max.x - bb.min.x) * (bb.max.y - bb.min.y) * (bb.max.z - bb.min.z) };
+    }).sort(function (a, b) { return a.v - b.v; });
+    return withVol[Math.floor(withVol.length / 2)].r;
+  }
+
   function buildVisitorCatalog() {
     catalog.forEach(function (c) { try { c.geo.dispose(); } catch (e) {} });
     catalog.length = 0;
     catMarkCid = null;   // alte Markierung zeigt sonst auf einen weggeworfenen Eintrag
 
     var movable = ramps.filter(function (r) { return !isPinned(r); });
-    var bySig = {}, order = [];
+
+    // Mit gepinnter Referenzmenge wird nach ÄHNLICHKEIT gruppiert, sonst wie
+    // bisher nach exakt gleicher Form (bei ungepinnter Halle gibt es keine
+    // Kategorien — und exakte Formgleichheit liefert dann sehr viele Einzelstücke).
+    var cats = categorizeMovables();
+    var groups = [], byKey = {};
     movable.forEach(function (r) {
-      var sig = visGeoSig(r);
-      if (!bySig[sig]) { bySig[sig] = { sig: sig, first: r, list: [] }; order.push(bySig[sig]); }
-      bySig[sig].list.push(r);
+      var key = cats ? (cats[r.id] || 'Sonstige') : visGeoSig(r);
+      if (!byKey[key]) { byKey[key] = { key: key, list: [] }; groups.push(byKey[key]); }
+      byKey[key].list.push(r);
     });
 
-    order.forEach(function (grp, i) {
+    // Stabile Farbvergabe: alphabetisch nach Kategorie, damit dieselbe Kategorie
+    // bei jedem Moduswechsel dieselbe Signalfarbe bekommt.
+    if (cats) {
+      groups.sort(function (a, b) { return a.key < b.key ? -1 : (a.key > b.key ? 1 : 0); });
+    }
+
+    groups.forEach(function (grp, i) {
       var col = VIS_PALETTE[i % VIS_PALETTE.length];
-      // Grundfarbe für den Typ, abgestufte Töne für die einzelnen Exemplare
+      // Grundfarbe für die Kategorie, abgestufte Töne für die einzelnen Exemplare
       grp.list.forEach(function (r, k) { r.visColor = shadeOf(col, k, grp.list.length); });
-      var r0 = grp.first;
-      catAddEntry(r0.name, r0.layer, col, r0.mesh.geometry.clone(),
+      var r0 = representativeOf(grp.list);
+      catAddEntry(cats ? grp.key : r0.name, r0.layer, col, r0.mesh.geometry.clone(),
         { x: r0.mesh.position.x, y: r0.mesh.position.y, z: r0.mesh.position.z });
       var entry = catalog[catalog.length - 1];
       entry.visColor = col;
       entry.visCount = grp.list.length;
+      entry.isCategory = !!cats;
       // Rückverweis Rampe → Katalogeintrag (für Markierung und Tutorial)
       grp.list.forEach(function (r) { r.visCid = entry.cid; });
     });
 
     updateCatCount();
-    return order.length;
+    return groups.length;
   }
 
   function applyVisitorColors() { ramps.forEach(applyLayerColor); }
@@ -4892,8 +5103,11 @@
       visCatalogBuilt = true;
       applyVisitorColors();
       renderCatalogList(); renderRampList(); renderLayerList();
+      var hatRef = ramps.some(function (r) { return isPinned(r); });
       status(n
-        ? 'Besuchermodus — ' + n + ' bewegliche Rampentyp(en) im Katalog. Graue Elemente stehen fest.'
+        ? ('Besuchermodus — ' + n + (hatRef
+            ? ' Kategorie(n) im Katalog, nach Ähnlichkeit zu den festen Rampen eingeordnet.'
+            : ' Rampentyp(en) im Katalog. Hinweis: ohne gepinnte Rampen gibt es keine Vergleichsbasis — im Betreibermodus die festen Elemente pinnen.'))
         : 'Besuchermodus — es sind keine beweglichen Rampen vorhanden (alles gepinnt?).');
       tutMaybeOffer();
     } else {
@@ -4972,6 +5186,124 @@
     if (overlay) overlay.addEventListener('pointerdown', function (ev) { if (ev.target === overlay) closePinModal(); });
   }
 
+  // ═════════════════════════════════════════════════════════════════
+  //  Besucher-Layer: eigene Gruppierung neben den Rhino-Layern.
+  //  Bewusst ein eigenes Feld (r.vLayer) statt r.layer zu überschreiben —
+  //  sonst ginge die Kategorie-Zuordnung und damit die Einfärbung verloren.
+  //  Genau ein Layer je Rampe; erneutes Antippen nimmt sie wieder heraus.
+  // ═════════════════════════════════════════════════════════════════
+  var visLayers = [];   // Namen, Reihenfolge = Anzeigereihenfolge
+
+  function vLayerCount(name) {
+    return ramps.filter(function (r) { return r.vLayer === name; }).length;
+  }
+
+  function renderVLayerList() {
+    var box = document.getElementById('vLayerList');
+    if (!box) return;
+    box.innerHTML = '';
+    if (!visLayers.length) {
+      box.innerHTML = '<div class="v-empty">Noch keine Layer. Oben einen Namen eingeben und auf + tippen.</div>';
+      return;
+    }
+    var sel = findRamp(selectedId);
+    visLayers.forEach(function (name) {
+      var row = document.createElement('div');
+      row.className = 'vl-row' + (sel && sel.vLayer === name ? ' active' : '');
+      row.title = sel ? 'Auswahl hier einsortieren / herausnehmen' : 'Erst eine Rampe auswählen';
+
+      var nm = document.createElement('div'); nm.className = 'vl-name'; nm.textContent = name;
+      var ct = document.createElement('span'); ct.className = 'vl-count'; ct.textContent = vLayerCount(name);
+      var del = document.createElement('button'); del.className = 'vl-del';
+      del.textContent = '✕'; del.title = 'Layer löschen (Rampen bleiben erhalten)';
+
+      del.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        ramps.forEach(function (r) { if (r.vLayer === name) r.vLayer = null; });
+        visLayers = visLayers.filter(function (x) { return x !== name; });
+        renderVLayerList();
+        status('Layer „' + name + '" gelöscht — die Rampen selbst bleiben.');
+      });
+
+      row.addEventListener('click', function () { assignSelectionToVLayer(name); });
+      row.appendChild(nm); row.appendChild(ct); row.appendChild(del);
+      box.appendChild(row);
+    });
+  }
+
+  function assignSelectionToVLayer(name) {
+    var ids = selIds.length ? selIds.slice() : (selectedId ? [selectedId] : []);
+    if (!ids.length) { status('Erst eine Rampe auswählen, dann den Layer antippen.'); return; }
+    // Sind alle schon drin → heraus, sonst alle hinein
+    var alleDrin = ids.every(function (id) { var r = findRamp(id); return r && r.vLayer === name; });
+    ids.forEach(function (id) {
+      var r = findRamp(id); if (!r) return;
+      r.vLayer = alleDrin ? null : name;
+    });
+    renderVLayerList();
+    status(alleDrin
+      ? ids.length + ' Rampe(n) aus „' + name + '" entfernt.'
+      : ids.length + ' Rampe(n) in „' + name + '" einsortiert.');
+  }
+
+  function addVLayer() {
+    var inp = document.getElementById('vLayerName');
+    if (!inp) return;
+    var name = (inp.value || '').trim();
+    if (!name) { status('Bitte einen Namen für den Layer eingeben.'); return; }
+    if (visLayers.indexOf(name) !== -1) { status('Diesen Layer gibt es schon.'); return; }
+    visLayers.push(name);
+    inp.value = '';
+    renderVLayerList();
+    status('Layer „' + name + '" angelegt — jetzt Rampen auswählen und antippen.');
+  }
+
+  // ═════════════════════════════════════════════════════════════════
+  //  Export mit Layer-Auswahl
+  // ═════════════════════════════════════════════════════════════════
+  function openExportModal() {
+    var list = document.getElementById('expList');
+    if (!list) { exportJson(); return; }
+    list.innerHTML = '';
+
+    var gruppen = visLayers.map(function (n) { return { key: n, label: n }; });
+    var ohne = ramps.filter(function (r) { return r.mesh.visible && !r.vLayer; }).length;
+    if (ohne) gruppen.push({ key: null, label: 'Ohne Layer' });
+
+    if (!gruppen.length) { exportJson(); return; }   // nichts zu wählen
+
+    gruppen.forEach(function (g, i) {
+      var n = ramps.filter(function (r) {
+        return r.mesh.visible && (g.key === null ? !r.vLayer : r.vLayer === g.key);
+      }).length;
+      var row = document.createElement('label'); row.className = 'exp-row';
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = true;
+      cb.dataset.key = (g.key === null ? '' : g.key);
+      cb.dataset.ohne = (g.key === null ? '1' : '');
+      var nm = document.createElement('span'); nm.className = 'exp-name'; nm.textContent = g.label;
+      var ct = document.createElement('span'); ct.className = 'exp-count';
+      ct.textContent = n + (n === 1 ? ' Objekt' : ' Objekte');
+      row.appendChild(cb); row.appendChild(nm); row.appendChild(ct);
+      list.appendChild(row);
+    });
+    document.getElementById('expModal').classList.add('show');
+  }
+
+  function runExportFromModal() {
+    var boxes = document.querySelectorAll('#expList input[type=checkbox]');
+    var namen = [], ohneAn = false;
+    Array.prototype.forEach.call(boxes, function (cb) {
+      if (!cb.checked) return;
+      if (cb.dataset.ohne === '1') ohneAn = true;
+      else namen.push(cb.dataset.key);
+    });
+    if (!namen.length && !ohneAn) { status('Kein Layer ausgewählt — nichts exportiert.'); return; }
+    document.getElementById('expModal').classList.remove('show');
+    exportJson(function (r) {
+      return r.vLayer ? namen.indexOf(r.vLayer) !== -1 : ohneAn;
+    });
+  }
+
   function bindVisitorUI() {
     var byId = function (id) { return document.getElementById(id); };
 
@@ -4990,8 +5322,23 @@
 
     var ex = byId('vExportJson');
     if (ex) ex.addEventListener('click', function () {
-      try { exportJson(); } catch (err) { status('JSON-Export fehlgeschlagen: ' + err.message); console.error(err); }
+      try { openExportModal(); } catch (err) { status('JSON-Export fehlgeschlagen: ' + err.message); console.error(err); }
     });
+
+    var la = byId('vLayerAdd'); if (la) la.addEventListener('click', addVLayer);
+    var li = byId('vLayerName');
+    if (li) li.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); addVLayer(); }
+      ev.stopPropagation();
+    });
+    var eo = byId('expOk'); if (eo) eo.addEventListener('click', runExportFromModal);
+    var ec = byId('expCancel'); if (ec) ec.addEventListener('click', function () {
+      byId('expModal').classList.remove('show');
+    });
+    var ex2 = byId('expClose'); if (ex2) ex2.addEventListener('click', function () {
+      byId('expModal').classList.remove('show');
+    });
+    renderVLayerList();
 
     var u = byId('vUndo'); if (u) u.addEventListener('click', doUndo);
     var rd = byId('vRedo'); if (rd) rd.addEventListener('click', doRedo);

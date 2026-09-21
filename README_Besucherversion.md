@@ -180,6 +180,48 @@ Jederzeit neu startbar über *☰ Menü → Hilfe → 🎓 Tutorial starten*, ab
   hindurch (Shift+Tab rückwärts), der gerade gemeinte leuchtet cyan. Ein Klick
   übernimmt genau diesen, nicht den vordersten.
 
+### Kategorien: Einordnung nach Ähnlichkeit
+
+Beim Wechsel in den Besuchermodus vergleicht die App jede **bewegliche** Rampe mit
+den **gepinnten** und ordnet sie der Kategorie (= Layer) der ähnlichsten festen
+Objekte zu. Verfahren: **k-Nearest-Neighbour (k=3)** auf z-standardisierten
+Merkmalen — logarithmierte Maße, Steilheit H/L, Breitenverhältnis B/L und ein
+flächengewichtetes **Neigungshistogramm** der Flächennormalen (waagerecht →
+senkrecht). Das Histogramm ist nötig, weil eine Bounding-Box eine gekrümmte
+Quarterpipe nicht von einer schrägen Bank trennen kann. Liegt nichts näher als
+2,5 Standardabweichungen, landet die Rampe in „Sonstige".
+
+Warum k-NN und nicht k-Means: die Kategorien sind durch das Pinnen bereits
+vorgegeben — es ist ein Zuordnungs-, kein Clusterproblem. k-NN ist dafür
+deterministisch, ohne Training und nachvollziehbar dokumentierbar.
+
+> ⚠️ **Gemessene Genauigkeit:** In einer Leave-one-out-Kreuzvalidierung auf
+> `spotSkatehalle_IST.3dm` trifft die Zuordnung die Layer-Wahrheit in **rund 62 %**
+> der Fälle (Bounding-Box allein: 54 %). Rails werden fast immer erkannt (89–94 %),
+> Walls kaum (20–29 %). Die Einordnung ist damit eine **Vorsortierung, keine
+> sichere Klassifikation** — die Verwechslungen passieren überwiegend zwischen
+> ohnehin ähnlichen Familien (BNKS ↔ QTRS ↔ Flats). Wer eine exakte Gruppierung
+> braucht, korrigiert sie über *Meine Layer*.
+>
+> Grund für die Grenze: die Objekte der Datei tragen **keine Namen**, es gibt also
+> außer Layer und Geometrie keine Information. Sprechende Objektnamen in Rhino
+> (z. B. „quarterpipe_03") würden die Zuordnung deutlich sicherer machen.
+
+Ohne gepinnte Rampen gibt es keine Vergleichsbasis — dann gruppiert die App wie
+zuvor nach exakt gleicher Form und weist in der Statuszeile darauf hin.
+
+### Meine Layer (Besuchermodus)
+
+Über *☰ Menü → Meine Layer* legt der Besucher eigene Gruppen an: Name eingeben,
+**+**, dann eine Rampe auswählen und den Layer antippen. Erneutes Antippen nimmt
+sie wieder heraus, das ✕ löscht den Layer (die Rampen bleiben erhalten). Jede
+Rampe gehört zu höchstens einem Besucher-Layer; die Rhino-Layer bleiben davon
+unberührt, damit Kategorie und Einfärbung erhalten bleiben.
+
+Beim **JSON-Export** fragt die App, welche dieser Layer mitsollen — jede Gruppe
+mit Objektzahl zum Anhaken, plus „Ohne Layer". Im JSON steht der gewählte Layer
+je Element unter `visitorLayer`.
+
 ### Farbgebung
 
 | Was | Farbe |
