@@ -295,7 +295,7 @@
 
   /* ── Info-Popup (Doppelklick) ── */
   #infoPopup {
-    position: absolute; top: 44px; right: 16px; width: 302px; z-index: 26;
+    position: absolute; top: 44px; right: 16px; width: 302px; z-index: 36;
     background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
     box-shadow: 0 12px 32px rgba(0,0,0,.5); display: flex; overflow: hidden;
     max-height: calc(100% - 110px); flex-direction: column;
@@ -443,9 +443,11 @@
   .cat-drawer-grid {
     flex: 1; overflow-y: auto; padding: 16px; display: grid;
     /* auto-fill statt fester 3 Spalten: der Drawer ist per Anfasser breiten-verstellbar,
-       das Raster folgt der Breite von selbst (1-n Spalten) statt zu quetschen. */
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    grid-auto-rows: 1fr; gap: 14px; align-content: start;
+       das Raster folgt der Breite von selbst (1-n Spalten) statt zu quetschen.
+       grid-auto-rows: auto — mit 1fr wurden alle Zeilen auf gleiche Höhe gezwungen und
+       die Textzeilen darunter zusammengequetscht. */
+    grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
+    grid-auto-rows: auto; gap: 14px; align-content: start;
   }
   .cat-card {
     display: flex; flex-direction: column; background: var(--panel-2); border: 1px solid var(--line);
@@ -459,21 +461,32 @@
      Drags, weil diese Klasse ausschließlich beim Katalog-Grid-Aufbau vergeben wird. */
   .cat-card-enter { animation: card-enter .38s var(--ease-spring) backwards; }
   .cat-card-thumb {
-    aspect-ratio: 1 / 1; background: var(--panel); display: flex; align-items: center; justify-content: center;
+    /* feste Höhe statt 1:1 — sonst frisst das quadratische Bild in schmalen Spalten
+       die ganze Karte und die Infozeilen bleiben unleserlich. */
+    height: 104px; flex: 0 0 auto; background: var(--panel);
+    display: flex; align-items: center; justify-content: center;
   }
   .cat-card-thumb img { width: 100%; height: 100%; object-fit: contain; }
   .cat-card-name {
-    width: auto; font-size: 12.5px; font-weight: 600; margin: 8px 9px 0; padding: 4px 5px;
+    width: auto; font-size: 13px; font-weight: 700; margin: 9px 10px 0; padding: 4px 5px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     background: transparent; border: 1px solid transparent; border-radius: 6px; color: var(--text);
   }
   .cat-card-name { transition: background .15s var(--ease-snap), border-color .15s var(--ease-snap); }
   .cat-card-name:hover { border-color: var(--line); }
   .cat-card-name:focus { background: var(--panel); border-color: var(--accent); }
-  .cat-card-count { font-size: 10px; color: var(--muted); padding: 2px 9px 0; }
+  .cat-card-count {
+    font-size: 11px; font-weight: 600; color: var(--accent); padding: 4px 10px 0; cursor: pointer;
+  }
+  /* Maße der Rampe — die eigentliche Sachinformation auf der Karte */
+  .cat-card-dims {
+    font-size: 11px; color: var(--muted); padding: 3px 10px 0; line-height: 1.45;
+    font-variant-numeric: tabular-nums;
+  }
+  .cat-card-hint { font-size: 10px; color: #5e646d; padding: 3px 10px 0; font-style: italic; }
   .cat-card-add {
-    margin: 8px; cursor: pointer; background: var(--accent); color: #17191d; border: none;
-    border-radius: 7px; font-size: 11.5px; font-weight: 700; padding: 7px; white-space: nowrap;
+    margin: 10px; margin-top: auto; cursor: pointer; background: var(--accent); color: #17191d; border: none;
+    border-radius: 7px; font-size: 12px; font-weight: 700; padding: 9px; white-space: nowrap;
     transition: background .15s var(--ease-snap), transform .12s var(--ease-snap);
   }
   .cat-card-add:hover { background: #f4b357; }
@@ -493,7 +506,9 @@
 
   /* ── Hover-Tooltip an Rampen (Besuchermodus) ── */
   .hover-tip {
-    position: absolute; z-index: 24; width: 168px; pointer-events: none;
+    /* z-index über der Tutorial-Karte (34) — sonst verdeckt diese das Tooltip,
+       sobald die Maus unten im Bild auf einer Rampe stehen bleibt. */
+    position: absolute; z-index: 44; width: 182px; pointer-events: none;
     background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
     box-shadow: 0 12px 30px rgba(0,0,0,.5); overflow: hidden;
     opacity: 0; transform: scale(.9); transform-origin: top left;
@@ -511,6 +526,13 @@
   .hover-tip-badge.fix { background: #5a6069; color: #e7eaee; }
   .hover-tip-badge.mov { background: var(--accent); }
   .hover-tip-dims { font-size: 11px; color: var(--muted); padding: 7px 9px 9px; }
+  /* Nur sichtbar, wenn unter dem Cursor mehrere Körper übereinanderliegen */
+  .hover-tip-cycle {
+    display: none; font-size: 10.5px; font-weight: 700; color: var(--accent-2);
+    padding: 0 9px 9px; letter-spacing: .03em; line-height: 1.4;
+  }
+  .hover-tip.multi .hover-tip-cycle { display: block; }
+  .hover-tip.multi .hover-tip-dims { padding-bottom: 5px; }
 
   /* ── PIN-Modal (Betreiber setzt / Besucher gibt ein) ── */
   .modal-overlay {
@@ -1059,6 +1081,7 @@
     <div class="hover-tip-name" id="hoverTipName"></div>
     <span class="hover-tip-badge" id="hoverTipBadge"></span>
     <div class="hover-tip-dims" id="hoverTipDims"></div>
+    <div class="hover-tip-cycle" id="hoverTipCycle"></div>
   </div>
 
   <div id="rampPopup">
@@ -1193,6 +1216,7 @@
     <p class="tut-why" id="tutWhy"></p>
     <div class="tut-ok"><span>✅</span><span id="tutOkText"></span></div>
     <div class="tut-actions">
+      <button class="v-btn" id="tutPrev">Zurück</button>
       <button class="v-btn" id="tutSkip">Überspringen</button>
       <button class="v-btn primary" id="tutNext">Weiter</button>
     </div>
@@ -1292,6 +1316,30 @@
                      0xa885e8, 0xff8a5c, 0x4ecdc4, 0xc9d94f, 0xef6ec9];
   var visCatalogBuilt = false;   // Katalog nur beim ersten Wechsel automatisch füllen
   var catMarkCid = null;         // angeklickter Katalogeintrag → dessen Rampen leuchten in der Szene
+
+  // Stapel der Körper unter dem Mauszeiger. Liegen Rampen nah beieinander oder
+  // ineinander, sammelt der Raycast alle Treffer; Tab schaltet durch sie hindurch,
+  // solange das Info-Tooltip sichtbar ist.
+  var hoverPick = { ids: [], idx: 0, shown: false, x: 0, y: 0 };
+
+  // Auswahl- und Hover-Leuchtfarben. Bewusst grell und außerhalb der Rampen-Palette,
+  // damit „ausgewählt" nie mit einem Rampenton verwechselt werden kann.
+  var SEL_PRIMARY_EMISSIVE = 0xff0090;   // knalliges Magenta — primäre Auswahl
+  var SEL_GROUP_EMISSIVE   = 0xc2006e;   // gedämpfter für Mehrfachauswahl
+  var HOVER_EMISSIVE       = 0x00e5ff;   // Cyan — Körper unter dem Cursor (Tab-Durchschaltung)
+
+  // Ein Rampentyp bekommt eine Grundfarbe, seine einzelnen Exemplare gestaffelte
+  // Helligkeiten davon — so bleibt der Typ erkennbar und die Stücke unterscheidbar.
+  function shadeOf(baseHex, i, n) {
+    if (n <= 1) return baseHex;
+    var c = new THREE.Color(baseHex);
+    var hsl = {}; c.getHSL(hsl);
+    var t = (i / (n - 1)) - 0.5;                 // -0.5 … +0.5
+    var l = Math.max(0.24, Math.min(0.80, hsl.l + t * 0.34));
+    var sat = Math.max(0.25, Math.min(1, hsl.s - Math.abs(t) * 0.12));
+    c.setHSL(hsl.h, sat, l);
+    return c.getHex();
+  }
   var visArmedCid = null;        // Katalogeintrag wartet auf Klick-Platzierung
 
   // Rückkehr-PIN: rein im Arbeitsspeicher — nach Server-/Seiten-Neustart automatisch wieder leer.
@@ -1540,8 +1588,12 @@
     // einer vollen Halle sofort auffindbar.
     if (catMarkCid) {
       var k = 0.28 + 0.22 * Math.sin(performance.now() / 260);
+      var hoverId = hoverPick.shown ? hoverPick.ids[hoverPick.idx] : null;
       ramps.forEach(function (r) {
-        if (r.visCid === catMarkCid && selIds.indexOf(r.id) === -1) r.mesh.material.emissiveIntensity = k;
+        // Ausgewählte und der gerade anvisierte Körper behalten ihre eigene Leuchtstärke
+        if (r.visCid === catMarkCid && selIds.indexOf(r.id) === -1 && r.id !== hoverId) {
+          r.mesh.material.emissiveIntensity = k;
+        }
       });
     }
   }
@@ -2835,8 +2887,12 @@
       var on = selIds.indexOf(r.id) !== -1;
       r.mesh.material.emissive = r.mesh.material.emissive || new THREE.Color(0);
       if (on) {
-        r.mesh.material.emissive.setHex(r.id === selectedId ? 0xff5c38 : 0xc77a30);
-        r.mesh.material.emissiveIntensity = 0.35;
+        r.mesh.material.emissive.setHex(r.id === selectedId ? SEL_PRIMARY_EMISSIVE : SEL_GROUP_EMISSIVE);
+        r.mesh.material.emissiveIntensity = (r.id === selectedId) ? 0.95 : 0.55;
+      } else if (hoverPick.shown && hoverPick.ids[hoverPick.idx] === r.id) {
+        // Körper, der beim nächsten Klick drankommt (per Tab durchschaltbar)
+        r.mesh.material.emissive.setHex(HOVER_EMISSIVE);
+        r.mesh.material.emissiveIntensity = 0.6;
       } else if (catMarkCid && r.visCid === catMarkCid) {
         // Im Katalog angeklickt: alle Rampen dieses Typs leuchten auf (Puls in animate()).
         r.mesh.material.emissive.setHex(0xffffff);
@@ -2858,11 +2914,17 @@
     Array.prototype.forEach.call(document.querySelectorAll('#catDrawerGrid .cat-card'), function (el) {
       el.classList.toggle('marked', !!catMarkCid && el.dataset.cid === catMarkCid);
     });
-    if (!catMarkCid) { status('Markierung aufgehoben.'); return; }
+    if (!catMarkCid) { selectRamp(null); status('Markierung aufgehoben.'); return; }
     var hits = ramps.filter(function (r) { return r.visCid === catMarkCid; });
     var entry = catalog.filter(function (c) { return c.cid === catMarkCid; })[0];
-    status(hits.length + '× „' + (entry ? entry.name : 'Rampe') + '" in der Halle markiert' +
-      (hits.length ? ' — leuchtet weiß auf.' : '.'));
+    // Erstes Exemplar direkt auswählen, damit der Gumball (Pfeile + Drehring) sofort
+    // am Objekt steht und man ohne Umweg verschieben kann.
+    if (hits.length) {
+      selectRamp(hits[0].id, true);
+      if (!inView(hits[0])) focusObject(hits[0]);
+    }
+    status(hits.length + '× „' + (entry ? entry.name : 'Rampe') + '" markiert' +
+      (hits.length ? ' — erstes Exemplar ausgewählt, Tab wechselt beim Hovern durch Überlappungen.' : '.'));
   }
   function clearCatMark() {
     if (!catMarkCid) return;
@@ -3017,6 +3079,10 @@
         dom.setPointerCapture(e.pointerId);
       } else if (hits.length) {
         var hitId = hits[0].object.userData.rampId;
+        // Wurde per Tab ein hinterer Körper durchgeschaltet, gilt dieser statt des vordersten
+        if (hoverPick.shown && hoverPick.ids.length > 1 && hoverPick.ids[hoverPick.idx]) {
+          hitId = hoverPick.ids[hoverPick.idx];
+        }
         if (e.ctrlKey || e.metaKey) toggleSelect(hitId);
         else selectRamp(hitId, true);
       } else if (e.pointerType === 'touch') {
@@ -4097,6 +4163,17 @@
       var tag = (document.activeElement && document.activeElement.tagName) || '';
       if (tag === 'INPUT' || tag === 'SELECT') return;
 
+      // Tab schaltet durch übereinanderliegende Körper — nur solange das
+      // Info-Tooltip sichtbar ist, dann ist eindeutig, worauf es sich bezieht.
+      if (e.key === 'Tab' && hoverPick.shown && hoverPick.ids.length > 1) {
+        e.preventDefault();
+        var step = e.shiftKey ? -1 : 1;
+        hoverPick.idx = (hoverPick.idx + step + hoverPick.ids.length) % hoverPick.ids.length;
+        var hr = findRamp(hoverPick.ids[hoverPick.idx]);
+        if (hr) showHoverTip(hr, hoverPick.x, hoverPick.y);
+        return;
+      }
+
       // Undo / Redo
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); doUndo(); return; }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y' || (e.shiftKey && (e.key === 'z' || e.key === 'Z')))) { e.preventDefault(); doRedo(); return; }
@@ -4500,7 +4577,8 @@
 
     order.forEach(function (grp, i) {
       var col = VIS_PALETTE[i % VIS_PALETTE.length];
-      grp.list.forEach(function (r) { r.visColor = col; });
+      // Grundfarbe für den Typ, abgestufte Töne für die einzelnen Exemplare
+      grp.list.forEach(function (r, k) { r.visColor = shadeOf(col, k, grp.list.length); });
       var r0 = grp.first;
       catAddEntry(r0.name, r0.layer, col, r0.mesh.geometry.clone(),
         { x: r0.mesh.position.x, y: r0.mesh.position.y, z: r0.mesh.position.z });
@@ -4647,8 +4725,19 @@
       });
       nm.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') nm.blur(); ev.stopPropagation(); });
       nm.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+      nm.title = c.name;
       var cnt = document.createElement('div'); cnt.className = 'cat-card-count';
-      cnt.textContent = (c.visCount > 1 ? c.visCount + '× in der Halle' : 'in der Halle');
+      cnt.textContent = (c.visCount > 1 ? c.visCount + '× in der Halle' : '1× in der Halle');
+
+      // Maße aus der Katalog-Geometrie — die eigentliche Sachinformation der Karte
+      var dims = document.createElement('div'); dims.className = 'cat-card-dims';
+      if (!c.geo.boundingBox) c.geo.computeBoundingBox();
+      var cbb = c.geo.boundingBox;
+      dims.textContent = 'L ' + Math.round(cbb.max.x - cbb.min.x) +
+                       ' · B ' + Math.round(cbb.max.z - cbb.min.z) +
+                       ' · H ' + Math.round(cbb.max.y - cbb.min.y) + ' cm';
+      var hint = document.createElement('div'); hint.className = 'cat-card-hint';
+      hint.textContent = 'Klick = in der Halle zeigen';
 
       var add = document.createElement('button'); add.className = 'cat-card-add';
       add.textContent = (visArmedCid === c.cid ? 'Klicke …' : 'Platzieren');
@@ -4667,7 +4756,8 @@
       cnt.style.cursor = 'pointer';
       cnt.title = 'In den Ansichten markieren';
 
-      card.appendChild(thumb); card.appendChild(nm); card.appendChild(cnt); card.appendChild(add);
+      card.appendChild(thumb); card.appendChild(nm); card.appendChild(cnt);
+      card.appendChild(dims); card.appendChild(hint); card.appendChild(add);
       grid.appendChild(card);
     });
   }
@@ -4706,7 +4796,20 @@
     var bb = geo.boundingBox;
     var L = Math.round(bb.max.x - bb.min.x), H = Math.round(bb.max.y - bb.min.y), B = Math.round(bb.max.z - bb.min.z);
     document.getElementById('hoverTipDims').textContent = 'L ' + L + ' · B ' + B + ' · H ' + H + ' cm';
+
+    // Liegen mehrere Körper unter dem Cursor, zeigt das Tooltip die Position im
+    // Stapel — und schaltet damit die Tab-Durchschaltung sichtbar frei.
+    var multi = hoverPick.ids.length > 1;
+    tip.classList.toggle('multi', multi);
+    var cyc = document.getElementById('hoverTipCycle');
+    if (cyc) {
+      cyc.textContent = multi
+        ? ('Körper ' + (hoverPick.idx + 1) + ' von ' + hoverPick.ids.length + ' · Tab wechselt')
+        : '';
+    }
     tip.classList.add('show');
+    hoverPick.shown = true;
+    applySelectionVisuals();          // Cyan-Leuchten auf den gerade gemeinten Körper
     positionHoverTip(clientX, clientY);
   }
   function positionHoverTip(clientX, clientY) {
@@ -4726,6 +4829,7 @@
     clearTimeout(hoverTimer); hoverTimer = null;
     var tip = document.getElementById('hoverTip');
     if (tip) tip.classList.remove('show');
+    if (hoverPick.shown) { hoverPick.shown = false; applySelectionVisuals(); }
   }
   var HOVER_DELAY = 1000;   // ms Mausstillstand, bevor das Tooltip erscheint
   function bindHoverTip() {
@@ -4734,16 +4838,28 @@
       // Jede Mausbewegung verwirft das Tooltip sofort und startet die 2s-Wartezeit neu.
       clearTimeout(hoverTimer); hoverTimer = null;
       hideHoverTip();
-      if (!visitorMode || lassoDrag || rotDrag || gizmoDrag || measureMode || pendingStamp) return;
+      // Gilt in beiden Modi — der Betreiber braucht die Durchschaltung genauso.
+      if (lassoDrag || rotDrag || gizmoDrag || measureMode || pendingStamp || orbit) return;
       var hp = paneAt(e.clientX, e.clientY);
       if (!hp) return;
       raycaster.setFromCamera(ndcInPane(e.clientX, e.clientY, hp), hp.pane.camera);
       var meshes = ramps.filter(function (r) { return r.mesh.visible; }).map(function (r) { return r.mesh; });
       var hits = raycaster.intersectObjects(meshes, false);
       if (!hits.length) return;
-      var r = findRamp(hits[0].object.userData.rampId);
+      // Alle getroffenen Körper von vorne nach hinten; Mehrfachtreffer derselben
+      // Rampe zusammenfassen. Das ist der Stapel, durch den Tab schaltet.
+      var ids = [];
+      hits.forEach(function (h) {
+        var hid = h.object.userData.rampId;
+        if (hid && ids.indexOf(hid) === -1) ids.push(hid);
+      });
+      if (!ids.length) return;
       var cx = e.clientX, cy = e.clientY;
-      hoverTimer = setTimeout(function () { showHoverTip(r, cx, cy); }, HOVER_DELAY);
+      hoverTimer = setTimeout(function () {
+        hoverPick.ids = ids; hoverPick.idx = 0; hoverPick.x = cx; hoverPick.y = cy;
+        var r0 = findRamp(ids[0]);
+        if (r0) showHoverTip(r0, cx, cy);
+      }, HOVER_DELAY);
     });
     dom.addEventListener('pointerleave', hideHoverTip);
     dom.addEventListener('pointerdown', hideHoverTip);
@@ -5042,12 +5158,22 @@
     next.textContent = s0.last ? 'Tutorial beenden' : 'Weiter';
     next.style.display = frei ? '' : 'none';
     document.getElementById('tutSkip').style.display = frei ? 'none' : '';
+    document.getElementById('tutPrev').style.display = tut.i > 0 ? '' : 'none';
   }
 
   function tutNext() {
     if (!tut) return;
     if (tut.steps[tut.i].last) { tutEnd(true); return; }
     tut.i++; tut.solved = false;
+    tutRender();
+  }
+
+  function tutPrev() {
+    if (!tut || tut.i === 0) return;
+    tut.i--;
+    // Ein bereits gezeigter Schritt bleibt freigeschaltet — man muss ihn zum
+    // Weitergehen nicht noch einmal ausführen.
+    tut.solved = true;
     tutRender();
   }
 
@@ -5077,6 +5203,7 @@
     var cl = byId('tutModalClose'); if (cl) cl.addEventListener('click', hideModal);
     var nx = byId('tutNext'); if (nx) nx.addEventListener('click', tutNext);
     var sk = byId('tutSkip'); if (sk) sk.addEventListener('click', tutNext);
+    var pv = byId('tutPrev'); if (pv) pv.addEventListener('click', tutPrev);
     var xc = byId('tutClose'); if (xc) xc.addEventListener('click', function () { tutEnd(false); });
     var vt = byId('vTutorial'); if (vt) vt.addEventListener('click', function () {
       toggleMenuDrawer(false); tutStart();

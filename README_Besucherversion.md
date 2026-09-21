@@ -171,8 +171,25 @@ Jederzeit neu startbar über *☰ Menü → Hilfe → 🎓 Tutorial starten*, ab
   Browser gemerkt, Doppelklick auf den Anfasser setzt sie zurück. Das
   Katalog-Raster passt die Spaltenzahl automatisch an.
 - **Rampen finden:** Ein Klick auf das Bild einer Katalogkarte lässt **alle
-  Exemplare dieses Typs** in den Ansichten weiß aufleuchten (pulsierend).
-  Nochmal klicken hebt die Markierung auf.
+  Exemplare dieses Typs** in den Ansichten weiß aufleuchten (pulsierend) und
+  wählt das erste davon aus — der Gumball (Pfeile + Drehring) steht also sofort
+  am Objekt. Nochmal klicken hebt die Markierung auf.
+- **Verdeckte Körper auswählen** (beide Modi): Bleibt die Maus eine Sekunde auf
+  einer Rampe stehen, erscheint das Info-Fenster. Liegen dort mehrere Körper
+  übereinander, zeigt es „Körper 1 von 3“ — mit **Tab** schaltet man durch sie
+  hindurch (Shift+Tab rückwärts), der gerade gemeinte leuchtet cyan. Ein Klick
+  übernimmt genau diesen, nicht den vordersten.
+
+### Farbgebung
+
+| Was | Farbe |
+|---|---|
+| Fest verbaut | einheitlich grau |
+| Rampentyp | eine Grundfarbe je Typ |
+| Einzelne Rampe eines Typs | gestaffelte Helligkeit derselben Grundfarbe |
+| Ausgewählt | kräftiges **Magenta** — bewusst außerhalb der Rampen-Palette |
+| Unter dem Cursor (Tab-Durchschaltung) | **Cyan** |
+| Im Katalog markiert | weiß pulsierend |
 
 ---
 
