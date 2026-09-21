@@ -685,6 +685,46 @@
   }
   .tut-head button:hover { color: var(--danger); }
   .tut-body { padding: 12px 14px 14px; }
+  .tut-main { display: flex; gap: 12px; align-items: flex-start; }
+  .tut-text { flex: 1; min-width: 0; }
+  .tut-anim {
+    flex: 0 0 auto; width: 76px; height: 76px; border-radius: 10px;
+    background: rgba(255,255,255,.035); border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .tut-svg { width: 100%; height: 100%; display: block; }
+
+  /* ── Gesten-Animationen. Die globale prefers-reduced-motion-Regel weiter
+        oben friert sie automatisch ein. ── */
+  .tut-svg .ln { fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+  .tut-svg .bd { fill: var(--panel-2); stroke: var(--muted); stroke-width: 2; }
+  .tut-svg .hi { fill: var(--accent); }
+  .tut-svg .hi2 { fill: var(--accent-2); }
+  .tut-svg .dim { fill: #5a6069; }
+  .tut-svg .acc { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; }
+
+  @keyframes tut-slide-x { 0%, 100% { transform: translateX(-8px); } 50% { transform: translateX(8px); } }
+  @keyframes tut-blink   { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
+  @keyframes tut-tap     { 0%, 62%, 100% { transform: scale(1); } 72%, 92% { transform: scale(.8); } }
+  @keyframes tut-ripple  { 0% { transform: scale(.3); opacity: .85; } 100% { transform: scale(2.4); opacity: 0; } }
+  @keyframes tut-glow    { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+  @keyframes tut-draw    { 0% { stroke-dashoffset: 42; } 55%, 100% { stroke-dashoffset: 0; } }
+  @keyframes tut-arc     { 0% { stroke-dashoffset: 46; opacity: 0; } 25% { opacity: 1; }
+                           75% { stroke-dashoffset: 0; opacity: 1; } 100% { opacity: 0; } }
+
+  .tut-svg .a-slide  { animation: tut-slide-x 2.2s var(--ease-smooth) infinite; }
+  .tut-svg .a-blink  { animation: tut-blink 2.2s var(--ease-smooth) infinite; }
+  .tut-svg .a-tap    { animation: tut-tap 2.2s var(--ease-snap) infinite;
+                       transform-box: fill-box; transform-origin: center; }
+  .tut-svg .a-ripple { animation: tut-ripple 2.2s var(--ease-smooth) infinite;
+                       transform-box: fill-box; transform-origin: center; }
+  .tut-svg .a-glow   { animation: tut-glow 2.2s var(--ease-smooth) infinite; }
+  .tut-svg .a-draw   { stroke-dasharray: 42; animation: tut-draw 2.4s var(--ease-smooth) infinite; }
+  .tut-svg .a-arc    { stroke-dasharray: 46; animation: tut-arc 2.4s var(--ease-smooth) infinite; }
+
+  @media (max-width: 400px) {
+    .tut-anim { width: 60px; height: 60px; }
+  }
   .tut-task { font-size: 14px; font-weight: 600; margin: 0 0 6px; line-height: 1.4; }
   .tut-why { font-size: 11.5px; color: var(--muted); line-height: 1.55; margin: 0; }
   .tut-ok {
@@ -1302,9 +1342,14 @@
     <button id="tutClose" title="Tutorial beenden">✕</button>
   </div>
   <div class="tut-body">
-    <p class="tut-task" id="tutTask"></p>
-    <p class="tut-why" id="tutWhy"></p>
-    <div class="tut-ok"><span>✅</span><span id="tutOkText"></span></div>
+    <div class="tut-main">
+      <div class="tut-anim" id="tutAnim"></div>
+      <div class="tut-text">
+        <p class="tut-task" id="tutTask"></p>
+        <p class="tut-why" id="tutWhy"></p>
+        <div class="tut-ok"><span>✅</span><span id="tutOkText"></span></div>
+      </div>
+    </div>
     <div class="tut-actions">
       <button class="v-btn" id="tutPrev">Zurück</button>
       <button class="v-btn" id="tutSkip">Überspringen</button>
@@ -5510,6 +5555,104 @@
 
   function tutCoarse() { return window.matchMedia('(pointer: coarse)').matches; }
 
+  // ── Gesten-Animationen für die Tutorial-Karte ────────────────────────────
+  // Reines Inline-SVG mit CSS-Keyframes: keine Bilddateien, kein Extra-Skript,
+  // und die vorhandene prefers-reduced-motion-Regel friert alles automatisch ein.
+  function tutMouseSvg(hiLeft, hiRight, groupCls) {
+    var cls = groupCls ? ' class="' + groupCls + '"' : '';
+    return '<g' + cls + '>' +
+      '<rect class="bd" x="19" y="14" width="26" height="40" rx="13"/>' +
+      '<path class="' + (hiLeft ? 'hi a-blink' : 'dim') + '" d="M32 27 L32 14 A13 13 0 0 0 19 27 Z"/>' +
+      '<path class="' + (hiRight ? 'hi a-blink' : 'dim') + '" d="M32 27 L32 14 A13 13 0 0 1 45 27 Z"/>' +
+      '<line class="ln" x1="32" y1="14" x2="32" y2="27"/>' +
+      '</g>';
+  }
+
+  function tutFingerSvg(cls, cx, cy) {
+    var c = cls ? ' class="' + cls + '"' : '';
+    return '<g' + c + '>' +
+      '<circle class="hi" cx="' + cx + '" cy="' + cy + '" r="7"/>' +
+      '<circle class="acc" cx="' + cx + '" cy="' + cy + '" r="11" opacity=".5"/>' +
+      '</g>';
+  }
+
+  // Waagerechte Führungslinie mit Pfeilspitzen — zeigt "hin und her ziehen"
+  var TUT_GUIDE =
+    '<g opacity=".45">' +
+      '<path class="ln" d="M12 56 h40"/>' +
+      '<path class="ln" d="M16 52 l-4 4 l4 4"/>' +
+      '<path class="ln" d="M48 52 l4 4 l-4 4"/>' +
+    '</g>';
+
+  function tutAnimSvg(kind, touch) {
+    var open = '<svg class="tut-svg" viewBox="0 0 64 64" aria-hidden="true">';
+    var close = '</svg>';
+
+    if (kind === 'orbit') {
+      // Ansicht drehen: rechte Maustaste bzw. ein Finger, wischend.
+      // Der Bogen liegt über der Maus (y <= 12), die Maus beginnt erst bei y = 14.
+      var arc = '<path class="acc a-arc" d="M13 12 Q32 1 51 12"/>' +
+                '<path class="acc" d="M47 8 L51 12 L47 16" opacity=".75"/>';
+      return open + arc +
+        (touch ? tutFingerSvg('a-slide', 32, 36) : tutMouseSvg(false, true, 'a-slide')) +
+        TUT_GUIDE + close;
+    }
+
+    if (kind === 'colors') {
+      // Grau steht fest, farbig gehört dir
+      return open +
+        '<rect class="dim" x="8" y="20" width="20" height="20" rx="4"/>' +
+        '<rect class="hi a-glow" x="36" y="20" width="20" height="20" rx="4"/>' +
+        '<path class="ln" d="M12 48 h12" opacity=".55"/>' +
+        '<path class="acc a-glow" d="M40 48 h12"/>' + close;
+    }
+
+    if (kind === 'select') {
+      // Auswählen. Die "Klickstrahlen" liegen ÜBER der Maus statt dahinter —
+      // eine Welle hinter dem Mauskörper wäre unsichtbar.
+      if (touch) {
+        return open +
+          '<circle class="acc a-ripple" cx="32" cy="34" r="9"/>' +
+          tutFingerSvg('a-tap', 32, 34) +
+          '<text x="32" y="60" text-anchor="middle" font-size="9" fill="#8b919a">2x tippen</text>' +
+          close;
+      }
+      var rays =
+        '<g class="a-blink">' +
+          '<path class="acc" d="M26 8 l-3 -5"/>' +
+          '<path class="acc" d="M32 6 v-5"/>' +
+          '<path class="acc" d="M38 8 l3 -5"/>' +
+        '</g>';
+      return open + rays + tutMouseSvg(true, false, '') + close;
+    }
+
+    if (kind === 'move') {
+      // Verschieben: gedrückt halten und ziehen. Maus/Finger allein auf der
+      // Bühne, darunter die Führungslinie — kein Objekt, das verdeckt würde.
+      return open +
+        (touch ? tutFingerSvg('a-slide', 32, 34) : tutMouseSvg(true, false, 'a-slide')) +
+        TUT_GUIDE + close;
+    }
+
+    if (kind === 'catalog') {
+      // Katalogkarte antippen → Rampe in der Halle leuchtet auf.
+      // Die Welle wird NACH der Karte gezeichnet, liegt also sichtbar darüber.
+      return open +
+        '<rect class="bd" x="7" y="16" width="22" height="30" rx="4"/>' +
+        '<rect class="hi a-glow" x="11" y="20" width="14" height="10" rx="2"/>' +
+        '<path class="ln" d="M11 35 h14"/>' +
+        '<path class="ln" d="M11 40 h9"/>' +
+        '<circle class="acc a-ripple" cx="18" cy="31" r="9"/>' +
+        '<path class="hi2 a-glow" d="M40 44 q8 -16 16 0 z"/>' +
+        '<path class="ln" d="M36 48 h24" opacity=".35"/>' + close;
+    }
+
+    // 'done'
+    return open +
+      '<circle class="acc" cx="32" cy="32" r="18" opacity=".3"/>' +
+      '<path class="acc a-draw" d="M22 33 l7 7 l14 -15" stroke-width="3"/>' + close;
+  }
+
   // Häufigster beweglicher Rampentyp als Suchziel — den findet man am ehesten wieder.
   function tutPickTarget() {
     var best = null;
@@ -5526,11 +5669,11 @@
         why: touch
           ? 'Einen Finger über die Fläche ziehen dreht die Ansicht. Zwei Finger: auf- und zuziehen zoomt, gemeinsam schieben verschiebt.'
           : 'Rechte Maustaste halten und ziehen dreht die Ansicht, das Mausrad zoomt, die mittlere Taste schiebt.',
-        ev: 'orbit', ok: 'Genau so bewegst du dich durch die Halle.' },
+        ev: 'orbit', anim: 'orbit', ok: 'Genau so bewegst du dich durch die Halle.' },
 
       { task: 'Grau steht fest — farbig gehört dir.',
         why: 'Wände und fest verbaute Elemente sind einheitlich grau und lassen sich nicht bewegen. Alles Farbige darfst du verschieben, drehen, entfernen und nachlegen.',
-        manual: true },
+        manual: true, anim: 'colors' },
 
       { task: 'Such die Rampe „' + t.name + '“ und wähl sie aus.',
         why: 'Von diesem Typ steht ' + t.count + '× in der Halle — alle in derselben Farbe. '
@@ -5538,20 +5681,20 @@
            + ' Tipp: Im Katalog 📚 auf das Bild einer Rampe tippen lässt alle Exemplare in der Halle aufleuchten.',
         ev: 'select',
         test: function (id) { var r = findRamp(id); return !!r && !isPinned(r) && r.visCid === t.cid; },
-        ok: 'Gefunden! Die farbigen Pfeile daran sind jetzt dein Werkzeug.' },
+        anim: 'select', ok: 'Gefunden! Die farbigen Pfeile daran sind jetzt dein Werkzeug.' },
 
       { task: 'Verschieb diese Rampe an eine freie Stelle.',
         why: 'An einem der Pfeile ziehen verschiebt sie entlang dieser Achse, am Ring drehst du sie.'
            + (touch ? '' : ' Mit WASD oder den Pfeiltasten geht es ebenfalls.'),
-        ev: 'move', ok: 'Verschoben — so baust du die Halle Stück für Stück um.' },
+        ev: 'move', anim: 'move', ok: 'Verschoben — so baust du die Halle Stück für Stück um.' },
 
       { task: 'Öffne den Reiter 📚 Katalog und tippe auf ein Rampenbild.',
         why: 'Der Katalog ist der Bestand der Halle — neue Rampen kommen nicht dazu. Ein Tipp aufs Bild lässt alle Exemplare dieses Typs aufleuchten. Nimmst du eine Rampe heraus, bleibt ihre Karte unter „Entfernt“ stehen und du kannst sie zurücklegen.',
-        ev: 'catmark', ok: 'So findest du jeden Rampentyp in der Halle wieder.' },
+        ev: 'catmark', anim: 'catalog', ok: 'So findest du jeden Rampentyp in der Halle wieder.' },
 
       { task: 'Fertig — jetzt bist du dran!',
         why: 'Dein Entwurf lässt sich über ☰ Menü → 💾 „Entwurf als JSON speichern“ sichern. Verklickt? Mit ↶ geht jeder Schritt zurück. Das Tutorial startest du jederzeit erneut über ☰ Menü → Hilfe.',
-        manual: true, last: true }
+        manual: true, last: true, anim: 'done' }
     ];
   }
 
@@ -5580,6 +5723,11 @@
     document.getElementById('tutTask').textContent = s0.task;
     document.getElementById('tutWhy').textContent = s0.why;
     document.getElementById('tutOkText').textContent = s0.ok || 'Erledigt!';
+    var animBox = document.getElementById('tutAnim');
+    if (animBox) {
+      // Gelöster Schritt zeigt den Haken statt der Geste
+      animBox.innerHTML = tutAnimSvg(tut.solved ? 'done' : (s0.anim || 'done'), tutCoarse());
+    }
 
     var dots = document.getElementById('tutDots');
     dots.innerHTML = '';

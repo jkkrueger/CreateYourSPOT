@@ -185,6 +185,12 @@ Aktion wirklich passiert ist:
 Jederzeit neu startbar über *☰ Menü → Hilfe → 🎓 Tutorial starten*, abbrechbar
 über das ✕ der Karte.
 
+Zu jedem Schritt zeigt ein **animiertes Icon** die passende Geste — am PC mit
+Maus (gedrückte Taste hervorgehoben), am Touchgerät mit Finger. Die Grafiken sind
+Inline-SVG mit CSS-Keyframes, also ohne Bilddateien; bei *prefers-reduced-motion*
+stehen sie automatisch still. Ist ein Schritt gelöst, wechselt das Icon auf einen
+Haken.
+
 ### Bedienhilfen
 
 - **Drawer-Breite:** Menü- und Katalog-Fenster haben am rechten Rand einen
