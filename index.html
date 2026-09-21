@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Skatepark · 3dm aus Rhino → verschieben → (Blender/Rhino)</title>
 <style>
   :root {
@@ -87,6 +87,12 @@
   .dock-actions button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 2px 5px; border-radius: 5px; }
   .dock-actions button:hover { background: rgba(255,255,255,.08); color: var(--text); }
   .dock-body { padding: 12px 14px; overflow-y: auto; flex: 1; }
+  /* Abdunklung hinter einem offenen Panel — nur auf schmalen Bildschirmen sichtbar
+     (siehe Mobil-Media-Query unten), auf dem Desktop bleibt sie unsichtbar/inaktiv. */
+  #dockBackdrop {
+    position: fixed; inset: 0; background: rgba(10,11,13,.55);
+    opacity: 0; pointer-events: none; z-index: 24; transition: opacity .2s var(--ease-smooth);
+  }
 
   /* ── Rotation ── */
   .rot-row { display: flex; align-items: center; gap: 6px; }
@@ -205,7 +211,8 @@
   .ramp-del:hover { color: var(--danger); background: rgba(255,122,92,.12); }
 
   #stage { flex: 1; position: relative; overflow: hidden; }
-  #viewport { position: absolute; inset: 0; }
+  #viewport { position: absolute; inset: 0; touch-action: none; }
+  #viewport canvas { touch-action: none; }
   #statusbar {
     position: absolute; left: 0; right: 0; bottom: 0; background: rgba(23,25,29,.88);
     border-top: 1px solid var(--line); padding: 7px 14px; font-size: 12px; color: var(--muted);
@@ -615,6 +622,68 @@
     50%      { box-shadow: 0 0 0 6px rgba(232,163,61,0); }
   }
 
+  /* ══════════════════════════════════════════════════════════════════
+     MOBIL-LAYOUT (Handy / schmale Bildschirme)
+     Icon-Rail wird zur Bottom-Tab-Leiste; Panels werden zu Bottom-Sheets,
+     die sich über dem Viewport auffalten statt ihn seitlich zu
+     verdrängen — gleiches Prinzip wie #visitorUI weiter unten, das schon
+     als Overlay-Drawer gebaut ist. Der Viewport bleibt so am Handy immer
+     randvoll nutzbar, auch wenn ein Panel offen ist.
+     ══════════════════════════════════════════════════════════════════ */
+  @media (max-width: 760px) {
+    #rail {
+      position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 40;
+      width: auto; flex: none; flex-direction: row; align-items: center;
+      justify-content: flex-start; gap: 2px; border-right: none; border-top: 1px solid var(--line);
+      padding: 4px max(4px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .rail-logo, .rail-spacer { display: none; }
+    .rail-btn { width: 54px; height: 52px; flex: 0 0 auto; }
+    .rail-btn.active { box-shadow: inset 0 -3px 0 0 var(--accent); }
+
+    #dock {
+      position: fixed; left: 0; right: 0; bottom: 0; top: auto; z-index: 26;
+      width: auto; max-height: 70vh; height: auto;
+      display: flex; flex-direction: column;
+      border-right: none; border-radius: 16px 16px 0 0; overflow: hidden;
+      transform: translateY(100%); transition: transform .28s var(--ease-smooth);
+      padding-bottom: calc(60px + env(safe-area-inset-bottom));
+      box-sizing: border-box;
+      box-shadow: 0 -12px 34px rgba(0,0,0,.5);
+    }
+    #dock.open { transform: translateY(0); }
+    .dock-panel {
+      position: static; width: 100%; height: auto; min-height: 0;
+      opacity: 1; transform: none; pointer-events: auto; display: none;
+    }
+    .dock-panel.docked-open { display: flex; flex: 1; min-height: 0; }
+    .dock-panel.floating { width: min(90vw, 320px); }
+    .dock-head { border-radius: 16px 16px 0 0; padding-top: 16px; position: relative; cursor: default; }
+    .dock-head::before {
+      content: ''; position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+      width: 36px; height: 4px; border-radius: 2px; background: var(--line);
+    }
+    .dock-body { min-height: 0; }
+
+    #dock.open ~ #dockBackdrop { opacity: 1; pointer-events: auto; }
+
+    /* Großzügigere Antippflächen */
+    .btn, .v-btn, select, input[type="search"] { min-height: 42px; }
+
+    body.visitor #visitorUI { width: min(88vw, 340px); }
+  }
+
+  /* Zusätzliche Verdichtung für sehr schmale Handys (iPhone SE & Co.) —
+     Icon-Beschriftung raus, Kacheln etwas kleiner, damit die Bottom-Leiste
+     ohne viel Wischen auskommt und nichts abgeschnitten wirkt. */
+  @media (max-width: 400px) {
+    .rail-lbl { display: none; }
+    .rail-btn { width: 44px; height: 44px; font-size: 15px; }
+    .dock-head span { font-size: 11.5px; }
+    .dock-body { padding: 10px 12px; }
+  }
+
   /* Wer keine Bewegung möchte, bekommt keine — deckt alle Regeln oben pauschal ab. */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -654,7 +723,10 @@
     <div class="dock-actions"><button class="dock-float" title="Abdocken">⇱</button><button class="dock-close" title="Schließen">✕</button></div>
   </div>
   <div class="dock-body">
-    <button class="btn primary" id="btnPick3dm">.3dm wählen … <small>Explorer</small></button>
+    <div class="sect-label">Hinterlegte Dateien</div>
+    <div id="sampleList"><div class="ramp-empty">Lade Liste …</div></div>
+    <p class="hint" style="margin-bottom:10px">Die Standard-Datei wird beim Öffnen automatisch geladen.</p>
+    <button class="btn primary" id="btnPick3dm">Eigene .3dm wählen … <small>Explorer</small></button>
     <input type="file" id="dmInput" accept=".3dm" hidden>
     <div class="field" style="margin-top:8px">
       <label for="unitSel">Einheit der Datei (Skalierung)</label>
@@ -751,6 +823,10 @@
     <button class="btn" id="btnReset">Kamera zurücksetzen</button>
     <button class="btn" id="btnFit">Alles einpassen</button>
     <p class="hint">Pro Fenster oben links die Ansicht wählen. Klick aktiviert ein Fenster · rechte Maustaste: drehen (nur 3D) · Mausrad: zoomen · Mittlere Taste: schieben.</p>
+
+    <div class="sect-label" style="margin-top:14px">Handy-Bedienung</div>
+    <label class="chk-row"><input type="checkbox" id="chkMobileTapSelect"> Rampen per Antippen auswählen</label>
+    <p class="hint">Am Handy ist einfaches Antippen standardmäßig zum Drehen/Schwenken reserviert, damit Popups nicht ungewollt aufgehen. Eine Rampe <b>auswählen</b> geht immer per <b>Doppel-Tap</b> — oder hier dauerhaft umschalten.</p>
   </div>
 </div>
 
@@ -831,6 +907,9 @@
 </div>
 
 </div>
+<!-- Nur auf schmalen Bildschirmen sichtbar (siehe Mobil-Media-Query) — abdunkelt den
+     Viewport, während ein Panel als Bottom-Sheet offen ist; Antippen schließt es. -->
+<div id="dockBackdrop"></div>
 
 <!-- ══════════ Besuchermodus — eigene, reduzierte Oberfläche ══════════ -->
 <aside id="visitorUI">
@@ -1113,6 +1192,14 @@
 
   // Retrigger-Helfer für kurze "hier hat sich was verändert"-Animationen (Reflow erzwingen,
   // damit dieselbe CSS-Animation auch bei aufeinanderfolgenden Änderungen erneut abspielt).
+  // Muss zum Breakpoint der Mobil-Media-Query (siehe <style>) passen.
+  function isMobileLayout() { return window.matchMedia('(max-width: 760px)').matches; }
+  // Schalter im Ansicht-Panel: Rampen per einfachem Antippen auswählen (Handy).
+  // Standard aus — siehe Kommentar bei der Touch-Auswahl in bindPicking().
+  function mobileTapSelectEnabled() {
+    var el = document.getElementById('chkMobileTapSelect');
+    return !!(el && el.checked);
+  }
   function pulseEl(el, cls) {
     if (!el) return;
     el.classList.remove(cls);
@@ -1258,7 +1345,7 @@
     buildMeasureVisuals();
     window.addEventListener('resize', onResize);
     onResize();
-    bindNavigation(); bindPicking(); animate();
+    bindNavigation(); bindPicking(); bindTouchZoom(); animate();
   }
 
   // aktive Panes je nach Layout (1/2/4)
@@ -2771,10 +2858,22 @@
       raycaster.setFromCamera(ndcInPane(e.clientX, e.clientY, hp), hp.pane.camera);
       var meshes = ramps.filter(function (r) { return r.mesh.visible; }).map(function (r) { return r.mesh; });
       var hits = raycaster.intersectObjects(meshes, false);
-      if (hits.length) {
+      if (hits.length && e.pointerType === 'touch' && !mobileTapSelectEnabled()) {
+        // Handy-Standard: einfaches Antippen einer Rampe wählt sie NICHT aus (öffnet also
+        // kein Popup) — sonst reißt jede Dreh-/Schwenkbewegung, die zufällig auf einer Rampe
+        // beginnt, ungewollt ein Popup auf. Auswahl geht per Doppel-Tap (siehe dblclick weiter
+        // unten) oder wenn im Ansicht-Panel „Rampen per Antippen auswählen" aktiviert ist.
+        orbit = { type: 'rotate', paneIdx: hp.index, lastX: e.clientX, lastY: e.clientY };
+        dom.setPointerCapture(e.pointerId);
+      } else if (hits.length) {
         var hitId = hits[0].object.userData.rampId;
         if (e.ctrlKey || e.metaKey) toggleSelect(hitId);
         else selectRamp(hitId, true);
+      } else if (e.pointerType === 'touch') {
+        // Touch auf leeren Raum: Ein-Finger-Orbit (Rechtsklick-Drehen gibt's am Handy nicht;
+        // Lasso bleibt Maus/Trackpad vorbehalten). Nutzt dieselbe orbit-Logik wie bindNavigation().
+        orbit = { type: 'rotate', paneIdx: hp.index, lastX: e.clientX, lastY: e.clientY };
+        dom.setPointerCapture(e.pointerId);
       } else {
         // Leerer Raum: Lasso aufziehen — Auswahl passiert beim Loslassen
         lassoDrag = { hp: hp, x0: e.clientX, y0: e.clientY, additive: (e.ctrlKey || e.metaKey), prev: selIds.slice() };
@@ -2948,6 +3047,84 @@
         onResize();
       }
     }, { passive: false });
+  }
+
+  // ── Touch: Zwei-Finger Pinch-Zoom + Schwenken ─────────
+  // Ein-Finger-Orbit läuft über die normale orbit-Logik oben (bindPicking() setzt
+  // sie für Touch auf leerem Raum). Hier nur der Zwei-Finger-Fall, unabhängig davon.
+  function bindTouchZoom() {
+    var dom = renderer.domElement;
+    var touches = {};   // pointerId → {x,y}
+    var pinch = null;   // { paneIdx, lastDist, lastMid:{x,y} }
+
+    function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+    function mid(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+
+    dom.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'touch') return;
+      touches[e.pointerId] = { x: e.clientX, y: e.clientY };
+      var ids = Object.keys(touches);
+      if (ids.length === 2) {
+        // Ein-Finger-Gesten abbrechen — ab jetzt zählt nur noch die Zwei-Finger-Geste
+        // (Pointer-Capture des ersten Fingers bleibt bestehen, ist hier unschädlich —
+        // die zugehörigen Handler brechen wegen orbit === null / lassoDrag === null einfach ab.)
+        orbit = null; lassoDrag = null; gizmoDrag = null; rotDrag = null;
+        document.getElementById('lassoRect').style.display = 'none';
+        var a = touches[ids[0]], b = touches[ids[1]], m = mid(a, b);
+        var hp = paneAt(m.x, m.y);
+        pinch = { paneIdx: hp ? hp.index : activePane, lastDist: dist(a, b), lastMid: m };
+      }
+    });
+
+    dom.addEventListener('pointermove', function (e) {
+      if (e.pointerType !== 'touch' || !touches[e.pointerId]) return;
+      touches[e.pointerId] = { x: e.clientX, y: e.clientY };
+      var ids = Object.keys(touches);
+      if (!pinch || ids.length < 2) return;
+      var a = touches[ids[0]], b = touches[ids[1]];
+      var d = dist(a, b), m = mid(a, b);
+      var cam = activePanes()[pinch.paneIdx] ? activePanes()[pinch.paneIdx].camera : panes[0].camera;
+      var t = cam.userData.target;
+      var factor = pinch.lastDist / Math.max(d, 1);   // < 1 = auseinanderziehen = reinzoomen
+
+      if (cam.isPerspectiveCamera) {
+        var off = cam.position.clone().sub(t).multiplyScalar(factor);
+        var len = off.length();
+        if (len > 80 && len < 60000) cam.position.copy(t).add(off);
+      } else {
+        cam.userData.half = Math.min(Math.max(cam.userData.half * factor, 60), 12000);
+        onResize();
+      }
+
+      var dmx = m.x - pinch.lastMid.x, dmy = m.y - pinch.lastMid.y;
+      if (dmx || dmy) {
+        if (cam.isPerspectiveCamera) {
+          var dist2 = cam.position.distanceTo(t);
+          var panX = new THREE.Vector3(), panY = new THREE.Vector3();
+          cam.getWorldDirection(panX); panX.cross(cam.up).normalize();
+          panY.copy(cam.up).normalize();
+          var k = dist2 * 0.0016;
+          var move = panX.multiplyScalar(-dmx * k).add(panY.multiplyScalar(dmy * k));
+          cam.position.add(move); t.add(move); cam.lookAt(t);
+        } else {
+          var hp2 = paneAt(m.x, m.y) || { rect: paneRect(pinch.paneIdx) };
+          var sx = (cam.right - cam.left) / hp2.rect.w, sy = (cam.top - cam.bottom) / hp2.rect.h;
+          var right = new THREE.Vector3(); cam.getWorldDirection(right); right.cross(cam.up).normalize();
+          var up2 = cam.up.clone();
+          cam.position.add(right.multiplyScalar(-dmx * sx)).add(up2.multiplyScalar(dmy * sy));
+        }
+      }
+      pinch.lastDist = d; pinch.lastMid = m;
+    });
+
+    function endTouch(e) {
+      if (e.pointerType !== 'touch') return;
+      delete touches[e.pointerId];
+      if (Object.keys(touches).length < 2) pinch = null;
+    }
+    dom.addEventListener('pointerup', endTouch);
+    dom.addEventListener('pointercancel', endTouch);
+    dom.addEventListener('pointerleave', endTouch);
   }
 
   // Kamera auf alle Objekte einpassen (alle aktiven Panes)
@@ -3508,8 +3685,11 @@
         else floatPanel(id, Math.round(window.innerWidth * 0.32), 70);
       });
       // Klick-halten auf der Titelleiste = verschieben (dockt automatisch ab)
+      // — auf schmalen Bildschirmen ist das Panel ein Bottom-Sheet, dort stört
+      // das Abdocken-per-Drag nur (Schließen läuft dort über ✕ / Backdrop-Tap).
       head.addEventListener('pointerdown', function (e) {
         if (e.target.closest('.dock-actions')) return;
+        if (isMobileLayout()) return;
         var st = panelState[id];
         var rect = el.getBoundingClientRect();
         var offX = e.clientX - rect.left, offY = e.clientY - rect.top;
@@ -3543,7 +3723,54 @@
     document.getElementById('btnUndo').addEventListener('click', doUndo);
     document.getElementById('btnRedo').addEventListener('click', doRedo);
     updateUndoButtons();
+    // Mobil: Antippen des abgedunkelten Hintergrunds schließt das offene Bottom-Sheet
+    var backdrop = document.getElementById('dockBackdrop');
+    if (backdrop) backdrop.addEventListener('click', function () { if (dockedId) closePanel(dockedId); });
     applyPanelModes();
+  }
+
+  // ── Beispiel-Dateien (samples/index.json) ──────────────
+  function loadSampleList() {
+    var box = document.getElementById('sampleList');
+    if (window.__fileProtocol) {
+      box.innerHTML = '<div class="ramp-empty">Nur über einen lokalen Server verfügbar (siehe README).</div>';
+      return;
+    }
+    fetch('samples/index.json').then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (list) {
+      if (!list.length) { box.innerHTML = '<div class="ramp-empty">Keine Beispiel-Dateien hinterlegt.</div>'; return; }
+      box.innerHTML = '';
+      list.forEach(function (entry) {
+        var b = document.createElement('button');
+        b.className = 'btn';
+        b.style.marginBottom = '4px';
+        b.textContent = entry.name || entry.file;
+        b.addEventListener('click', function () { loadSampleFile(entry); });
+        box.appendChild(b);
+      });
+      // Standard-Datei ("default": true, sonst der erste Eintrag) gleich laden, damit die
+      // Halle ohne Zutun in der Szene steht — auch im Besuchermodus, wo es das Datei-Panel
+      // gar nicht gibt. Nur, wenn die Szene noch leer ist: eine bereits vom Nutzer geladene
+      // Datei wird nie überschrieben.
+      var def = list.find(function (e) { return e.default; }) || list[0];
+      if (def && !ramps.length) loadSampleFile(def);
+    }).catch(function (err) {
+      box.innerHTML = '<div class="ramp-empty">Liste nicht ladbar (' + err.message + ').</div>';
+    });
+  }
+
+  function loadSampleFile(entry) {
+    status('Lade Beispiel „' + (entry.name || entry.file) + '" …');
+    fetch('samples/' + entry.file).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.blob();
+    }).then(function (blob) {
+      load3dm(blob);
+    }).catch(function (err) {
+      status('Beispiel-Datei nicht ladbar: ' + err.message);
+    });
   }
 
   // ── UI-Bindings ───────────────────────────────────────
@@ -3554,6 +3781,7 @@
       if (dmInput.files.length) { status('Lese .3dm …'); load3dm(dmInput.files[0]); }
       dmInput.value = '';
     });
+    loadSampleList();
 
     // ── Katalog-Bindings ──
     document.getElementById('btnCatSel').addEventListener('click', catAddSelection);
@@ -4484,8 +4712,11 @@
       setTimeout(function () { document.body.classList.remove('boot-in'); }, 700);
       initScene(); buildPaneOverlays(); bindUI(); bindVisitorUI(); bindCatalogDrawer(); bindHoverTip(); bindPinModal();
       initPanels(); setLayout(1); renderTrashList();
-      status('Bereit — .3dm laden · Panels über die Icon-Leiste links (Tasten 1–6).' +
-        (window.__fileProtocol ? ' · Per Doppelklick geöffnet — der 3dm-Import benötigt dann Internet.' : ''));
+      // Über einen Server lädt loadSampleList() gleich die hinterlegte Halle nach und setzt
+      // dabei eine eigene Statusmeldung — hier deshalb nur der Fall ohne Server.
+      status(window.__fileProtocol
+        ? 'Per Doppelklick geöffnet — so lässt sich keine .3dm laden (auch die hinterlegte nicht). Bitte über „Start_Offline.bat“ starten (siehe README).'
+        : 'Bereit — Skatehalle wird geladen …' + (isMobileLayout() ? '' : ' · Panels über die Icon-Leiste links (Tasten 1–6).'));
     }
     catch (err) { status('Initialisierung fehlgeschlagen: ' + err.message); console.error(err); }
   }

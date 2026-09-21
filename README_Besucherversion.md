@@ -6,6 +6,45 @@ Ausführliche Bedienung: `Tutorial_Skatepark_Planer.txt`.
 
 ---
 
+## Online-Version
+
+**https://jkkrueger.github.io/skatehalle/**
+
+Läuft direkt im Browser — auch am Handy, ohne Installation und ohne lokalen
+Server. Die hinterlegte Skatehalle wird beim Öffnen automatisch geladen.
+
+> Erster Aufruf lädt rund 5 MB (rhino3dm, three.js, die `.3dm`). Im WLAN
+> unkritisch, über Mobilfunk kurz spürbar.
+
+---
+
+## Die hinterlegte Halle (Auto-Load)
+
+Beim Start lädt die App automatisch die Datei, die in `samples/index.json` mit
+`"default": true` markiert ist — in Betreiber- **und** Besuchermodus. Niemand
+muss also erst eine Datei auswählen.
+
+**Eine andere Halle hinterlegen:**
+
+1. Die `.3dm` nach `samples/` kopieren (mit Render-Meshes, siehe Abschnitt unten).
+2. In `samples/index.json` eintragen und `"default": true` dorthin verschieben:
+
+```json
+[
+  { "file": "meineHalle.3dm", "name": "Halle 2026", "default": true },
+  { "file": "spotSkatehalle_IST.3dm", "name": "Skatehalle – IST-Zustand" }
+]
+```
+
+Alle Einträge erscheinen zusätzlich im Panel *📁 Datei* unter **Hinterlegte
+Dateien** und lassen sich dort per Klick umschalten. Ohne `"default"` wird der
+erste Eintrag geladen.
+
+> Auto-Load braucht HTTP(S) — per Doppelklick (`file://`) blockiert der Browser
+> das Nachladen. Dann über die Online-Version oder einen lokalen Server starten.
+
+---
+
 ## Starten
 
 ### Variante A — Doppelklick (schnell, braucht Internet)
@@ -115,13 +154,14 @@ Fläche), **Verschieben / Drehen / Entfernen** der farbigen Rampen und den
 |---|---|
 | `index.html` | Die komplette Anwendung (Oberfläche, 3D-Ansicht, Import/Export) |
 | `vendor/` | Bibliotheken: three.js, rhino3dm (+ `.wasm`), GLTFExporter — **nicht löschen** |
+| `.nojekyll` | Schaltet die Jekyll-Verarbeitung von GitHub Pages ab — **nicht löschen** |
 | `Start_Offline.ps1` / `.bat` | Startet den lokalen Server und öffnet den Browser |
 | `Tutorial_Skatepark_Planer.txt` | Anwender-Tutorial |
 | `skatepark_import_mesh.py` | GhPython-Node: exakte Geometrie aus dem JSON nach Rhino |
 | `skatepark_split_layers.py` | GhPython-Node: Breps nach Layern in einen DataTree aufteilen |
 | `jsonImport_Besucherversion.gh` | Grasshopper-Definition für den JSON-Import |
 | `json/`, `ghOutput/` | Beispiel-/Austauschdateien |
-| `*.3dm` | Beispiel-Planungsdateien zum Ausprobieren |
+| `samples/` | Hinterlegte `.3dm`-Dateien + `index.json`. Der Eintrag mit `"default": true` wird beim Start automatisch geladen (siehe oben). |
 
 Die Anwendung ist als Ganzes weiterzugeben: **immer den kompletten Ordner
 kopieren**, die `index.html` allein funktioniert nicht.
