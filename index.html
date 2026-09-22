@@ -322,6 +322,15 @@
 
   /* ── Messwerkzeug ── */
   #measureLabels { position: absolute; inset: 0; pointer-events: none; z-index: 7; }
+  /* Die drei deckungsgleichen Ebenen der 3D-Bühne rücken gemeinsam nach rechts,
+     wenn links ein Drawer offen ist — so überlappen Katalog und Ansichtsfenster
+     nicht mehr. paneRect() rechnet anschließend automatisch mit der kleineren
+     Fläche, weil es sich an #viewport orientiert. Muss NACH den inset:0-Regeln
+     stehen, um deren left zu überschreiben. */
+  #viewport, #paneOverlay, #measureLabels {
+    left: var(--stage-left, 0px);
+    transition: left .28s var(--ease-smooth);
+  }
   .mlabel {
     position: absolute; transform: translate(-50%, -130%); white-space: nowrap;
     background: rgba(23,25,29,.92); border: 1px solid #4fd1c5; color: var(--text);
@@ -764,6 +773,23 @@
   .cat-filter button:hover { background: #272c33; color: var(--text); }
   .cat-filter button.active { border-color: var(--accent); color: var(--accent); }
 
+  /* Typ-Filter: Chips, mehrere gleichzeitig wählbar */
+  .cat-types {
+    flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 0 16px 10px; background: var(--panel-2); border-bottom: 1px solid var(--line);
+  }
+  .cat-types:empty { display: none; }
+  .cat-chip {
+    cursor: pointer; background: var(--panel); color: var(--muted);
+    border: 1px solid var(--line); border-radius: 20px; padding: 5px 11px;
+    font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 6px;
+    transition: background .15s var(--ease-snap), color .15s var(--ease-snap), border-color .15s var(--ease-snap);
+  }
+  .cat-chip:hover { background: #272c33; color: var(--text); }
+  .cat-chip.on { color: var(--text); border-color: var(--muted); background: #272c33; }
+  .cat-chip i { width: 9px; height: 9px; border-radius: 50%; display: block; font-style: normal; }
+  .cat-chip small { color: #5e646d; font-weight: 500; }
+
   /* ── Besucher-Layer (eigene Gruppierung, unabhängig von den Rhino-Layern) ── */
   .vl-new { display: flex; gap: 6px; margin-bottom: 8px; }
   .vl-new input {
@@ -1181,6 +1207,7 @@
       <button data-f="platziert">In der Halle</button>
       <button data-f="entfernt">Entfernt</button>
     </div>
+    <div class="cat-types" id="catTypeFilter"></div>
     <div class="cat-drawer-grid" id="catDrawerGrid"></div>
     <div class="cat-drawer-nav">
       <button id="catPagePrev" title="Vorherige Seite">‹</button>
@@ -1634,7 +1661,7 @@
 
     buildGizmo();
     buildMeasureVisuals();
-    window.addEventListener('resize', onResize);
+    window.addEventListener('resize', function () { syncStageOffset(); onResize(); });
     onResize();
     bindNavigation(); bindPicking(); bindTouchZoom(); animate();
   }
@@ -3058,14 +3085,16 @@
     if (!catMarkCid) { selectRamp(null); status('Markierung aufgehoben.'); return; }
     var hits = ramps.filter(function (r) { return r.visCid === catMarkCid; });
     var entry = catalog.filter(function (c) { return c.cid === catMarkCid; })[0];
-    // Erstes Exemplar direkt auswählen, damit der Gumball (Pfeile + Drehring) sofort
-    // am Objekt steht und man ohne Umweg verschieben kann.
+    var nm = entry ? entry.name : 'Rampe';
+    // Die Karte steht 1:1 für eine Rampe: direkt auswählen, damit der Gumball
+    // (Pfeile + Drehring) sofort am Objekt steht.
     if (hits.length) {
       selectRamp(hits[0].id, true);
       if (!inView(hits[0])) focusObject(hits[0]);
+      status('„' + nm + '" in der Halle markiert und ausgewählt.');
+    } else {
+      status('„' + nm + '" ist gerade herausgenommen — „Zurücklegen" holt sie zurück.');
     }
-    status(hits.length + '× „' + (entry ? entry.name : 'Rampe') + '" markiert' +
-      (hits.length ? ' — erstes Exemplar ausgewählt, Tab wechselt beim Hovern durch Überlappungen.' : '.'));
   }
   function clearCatMark() {
     if (!catMarkCid) return;
@@ -4847,19 +4876,6 @@
     renderVisitorCatalog();
   }
 
-  // Typischster Vertreter einer Gruppe = mittleres Bounding-Box-Volumen.
-  // Sein Bild steht stellvertretend auf der Katalogkarte.
-  function representativeOf(list) {
-    if (list.length < 3) return list[0];
-    var withVol = list.map(function (r) {
-      var geo = r.mesh.geometry;
-      if (!geo.boundingBox) geo.computeBoundingBox();
-      var bb = geo.boundingBox;
-      return { r: r, v: (bb.max.x - bb.min.x) * (bb.max.y - bb.min.y) * (bb.max.z - bb.min.z) };
-    }).sort(function (a, b) { return a.v - b.v; });
-    return withVol[Math.floor(withVol.length / 2)].r;
-  }
-
   function buildVisitorCatalog() {
     catalog.forEach(function (c) { try { c.geo.dispose(); } catch (e) {} });
     catalog.length = 0;
@@ -4890,17 +4906,22 @@
 
     groups.forEach(function (grp, i) {
       var col = VIS_PALETTE[i % VIS_PALETTE.length];
-      // Grundfarbe für die Kategorie, abgestufte Töne für die einzelnen Exemplare
-      grp.list.forEach(function (r, k) { r.visColor = shadeOf(col, k, grp.list.length); });
-      var r0 = representativeOf(grp.list);
-      catAddEntry(cats ? grp.key : r0.name, r0.layer, col, r0.mesh.geometry.clone(),
-        { x: r0.mesh.position.x, y: r0.mesh.position.y, z: r0.mesh.position.z });
-      var entry = catalog[catalog.length - 1];
-      entry.visColor = col;
-      entry.visCount = grp.list.length;
-      entry.isCategory = !!cats;
-      // Rückverweis Rampe → Katalogeintrag (für Markierung und Tutorial)
-      grp.list.forEach(function (r) { r.visCid = entry.cid; });
+      // Der Katalog ist die vollständige Bestandsliste: JEDE bewegliche Rampe
+      // bekommt eine eigene Karte. Die Kategorie liefert nur Grundfarbe und
+      // Namenspräfix, der laufende Index macht jedes Stück einzeln ansprechbar.
+      var praefix = cats ? grp.key : (grp.list[0].name || 'Rampe');
+      grp.list.forEach(function (r, k) {
+        var ton = shadeOf(col, k, grp.list.length);
+        r.visColor = ton;
+        catAddEntry(praefix + ' ' + (k + 1), r.layer, ton, r.mesh.geometry.clone(),
+          { x: r.mesh.position.x, y: r.mesh.position.y, z: r.mesh.position.z });
+        var entry = catalog[catalog.length - 1];
+        entry.visColor = ton;
+        entry.visCount = 1;
+        entry.cat = praefix;        // für den Typ-Filter
+        entry.catColor = col;
+        r.visCid = entry.cid;       // Rückverweis Rampe → Karte (1:1)
+      });
     });
 
     updateCatCount();
@@ -4974,6 +4995,7 @@
       else if (which === 'catalog' && catEl) offset = catEl.offsetWidth;
       tabs.style.left = offset + 'px';
     }
+    syncStageOffset();
   }
   function toggleMenuDrawer(force) {
     var wantOpen = (force != null) ? !!force : (leftPanel !== 'menu');
@@ -4987,17 +5009,53 @@
   }
 
   // ── Katalog-Galerie (ausklappbarer Drawer am linken Bildschirmrand) ──
-  var CAT_PAGE_SIZE = 6;
+  var CAT_PAGE_SIZE = 12;   // je Rampe eine Karte — entsprechend mehr pro Seite
   var catPage = 0;
   var catFilter = 'alle';   // 'alle' | 'platziert' | 'entfernt'
+  var catTypes = [];        // ausgewählte Rampentypen; leer = alle
+
+  // Chips für den Typ-Filter aus den vorhandenen Kategorien aufbauen
+  function renderCatTypeChips() {
+    var box = document.getElementById('catTypeFilter');
+    if (!box) return;
+    var typen = [], farbe = {}, anzahl = {};
+    catalog.forEach(function (c) {
+      var t = c.cat || 'Rampe';
+      if (typen.indexOf(t) === -1) { typen.push(t); farbe[t] = c.catColor != null ? c.catColor : c.visColor; }
+      anzahl[t] = (anzahl[t] || 0) + 1;
+    });
+    box.innerHTML = '';
+    if (typen.length < 2) return;   // ein einziger Typ braucht keinen Filter
+    typen.forEach(function (t) {
+      var b = document.createElement('button');
+      b.className = 'cat-chip' + (catTypes.indexOf(t) !== -1 ? ' on' : '');
+      b.title = catTypes.indexOf(t) !== -1 ? 'Typ wieder ausblenden' : 'Nur diesen Typ zeigen';
+      var dot = document.createElement('i');
+      dot.style.background = hex(farbe[t] != null ? farbe[t] : 0x888c93);
+      var lbl = document.createElement('span'); lbl.textContent = t;
+      var num = document.createElement('small'); num.textContent = anzahl[t];
+      b.appendChild(dot); b.appendChild(lbl); b.appendChild(num);
+      b.addEventListener('click', function () {
+        var i = catTypes.indexOf(t);
+        if (i === -1) catTypes.push(t); else catTypes.splice(i, 1);
+        catPage = 0;
+        renderVisitorCatalog();
+      });
+      box.appendChild(b);
+    });
+  }
 
   function renderVisitorCatalog() {
     var cntLbl = document.getElementById('catDrawerCount');
     if (cntLbl) cntLbl.textContent = catalog.length ? '(' + catalog.length + ')' : '';
     if (leftPanel !== 'catalog') return;   // teuer (rendert 3D-Vorschauen) — nur bei geöffnetem Drawer aufbauen
 
-    // Filter: Alle / nur in der Halle stehende / nur herausgenommene Typen
+    renderCatTypeChips();
+
+    // Zwei Filter greifen zusammen: Zustand (alle/in der Halle/entfernt)
+    // und Rampentyp (beliebig viele Typen gleichzeitig).
     var sichtbar = catalog.filter(function (c) {
+      if (catTypes.length && catTypes.indexOf(c.cat) === -1) return false;
       if (catFilter === 'platziert') return catPlacedCount(c.cid) > 0;
       if (catFilter === 'entfernt') return catRemovedCount(c.cid) > 0;
       return true;
@@ -5058,7 +5116,7 @@
       var drin = catPlacedCount(c.cid), raus = catRemovedCount(c.cid);
       if (!drin) card.classList.add('leer');
       var cnt = document.createElement('div'); cnt.className = 'cat-card-count';
-      cnt.textContent = drin ? (drin + '× in der Halle') : 'nicht in der Halle';
+      cnt.textContent = drin ? 'in der Halle' : 'herausgenommen';
 
       // Maße aus der Katalog-Geometrie — die eigentliche Sachinformation der Karte
       var dims = document.createElement('div'); dims.className = 'cat-card-dims';
@@ -5070,13 +5128,13 @@
       var hint = document.createElement('div'); hint.className = 'cat-card-hint';
       hint.textContent = 'Klick = in der Halle zeigen';
       var gone = document.createElement('div'); gone.className = 'cat-card-gone';
-      gone.textContent = raus ? (raus + '× herausgenommen') : '';
+      gone.textContent = raus ? 'liegt im Papierkorb' : '';
 
       // Es werden bewusst KEINE neuen Rampen erzeugt — der Besucher arbeitet nur
       // mit dem vorhandenen Bestand. Der Button holt ein herausgenommenes
       // Exemplar an seine alte Stelle zurück.
       var add = document.createElement('button'); add.className = 'cat-card-back';
-      add.textContent = raus ? ('↩ Zurücklegen (' + raus + ')') : 'Alle in der Halle';
+      add.textContent = raus ? '↩ Zurücklegen' : 'Steht in der Halle';
       add.disabled = !raus;
       add.addEventListener('click', function (ev) {
         ev.stopPropagation();
@@ -5232,6 +5290,7 @@
     visitorMode = !!on;
     document.body.classList.toggle('visitor', visitorMode);
     setLeftPanel(null);   // Viewport startet immer maximiert, ohne offenen Drawer
+    syncStageOffset();
     hideHoverTip();
     catPage = 0;
 
@@ -5493,6 +5552,26 @@
   var DRAWER_MIN = 240;
   function drawerMax() { return Math.max(DRAWER_MIN, Math.min(window.innerWidth - 56, 1100)); }
 
+  // Ansichtsfenster an den offenen Drawer anpassen. Der Offset umfasst den
+  // Drawer UND die Reiterleiste, damit wirklich nichts überlappt. Am Handy
+  // bleibt es beim Overlay — dort wäre für die 3D-Ansicht sonst kaum Platz.
+  function syncStageOffset() {
+    var stageEl = document.getElementById('stage');
+    if (!stageEl) return;
+    var off = 0;
+    if (!isMobileLayout()) {
+      var openEl = document.querySelector('#visitorUI.open, #catDrawer.open');
+      if (openEl) {
+        var tabs = document.getElementById('edgeTabs');
+        off = openEl.offsetWidth + ((tabs && tabs.offsetWidth) || 0);
+        // Immer einen nutzbaren Rest 3D-Ansicht stehen lassen
+        off = Math.max(0, Math.min(off, stageEl.clientWidth - 160));
+      }
+    }
+    stageEl.style.setProperty('--stage-left', off + 'px');
+    if (typeof renderer !== 'undefined' && renderer) onResize();
+  }
+
   function syncEdgeTabs() {
     var tabs = document.getElementById('edgeTabs');
     if (!tabs) return;
@@ -5505,6 +5584,7 @@
     el.style.width = w + 'px';
     if (key) { try { localStorage.setItem(key, String(Math.round(w))); } catch (e) {} }
     syncEdgeTabs();
+    syncStageOffset();   // Ansichtsfenster ziehen beim Ziehen live mit
   }
 
   function initDrawerResize() {
@@ -5547,6 +5627,7 @@
         el.style.width = '';
         try { localStorage.removeItem(cfg.key); } catch (e2) {}
         syncEdgeTabs();
+        syncStageOffset();
         status('Breite auf Standard zurückgesetzt.');
       });
     });
@@ -5660,12 +5741,13 @@
   }
 
   // Häufigster beweglicher Rampentyp als Suchziel — den findet man am ehesten wieder.
+  // Eine konkrete, gerade aufgestellte Rampe als Suchziel — nicht die erste,
+  // damit man tatsächlich suchen muss.
   function tutPickTarget() {
-    var best = null;
-    catalog.forEach(function (c) {
-      if (!best || (c.visCount || 1) > (best.visCount || 1)) best = c;
-    });
-    return best ? { cid: best.cid, name: best.name, count: best.visCount || 1 } : null;
+    var da = catalog.filter(function (c) { return catPlacedCount(c.cid) > 0; });
+    if (!da.length) return null;
+    var pick = da[Math.floor(da.length / 2)];
+    return { cid: pick.cid, name: pick.name, cat: pick.cat || '' };
   }
 
   function tutSteps(t) {
@@ -5682,9 +5764,8 @@
         manual: true, anim: 'colors' },
 
       { task: 'Such die Rampe „' + t.name + '“ und wähl sie aus.',
-        why: 'Von diesem Typ steht ' + t.count + '× in der Halle — alle in derselben Farbe. '
-           + (touch ? 'Am Handy wählst du mit einem Doppel-Tipp aus.' : 'Ein Klick darauf genügt.')
-           + ' Tipp: Im Katalog 📚 auf das Bild einer Rampe tippen lässt alle Exemplare in der Halle aufleuchten.',
+        why: 'Jede bewegliche Rampe hat einen eigenen Eintrag im Katalog 📚 — dort auf ihr Bild tippen lässt genau dieses Stück in der Halle aufleuchten und wählt es aus. '
+           + (touch ? 'Direkt im Bild wählst du mit einem Doppel-Tipp aus.' : 'Direkt im Bild genügt ein Klick darauf.'),
         ev: 'select',
         test: function (id) { var r = findRamp(id); return !!r && !isPinned(r) && r.visCid === t.cid; },
         anim: 'select', ok: 'Gefunden! Die farbigen Pfeile daran sind jetzt dein Werkzeug.' },

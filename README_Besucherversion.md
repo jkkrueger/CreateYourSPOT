@@ -133,13 +133,12 @@ vorbereitet: `.3dm` laden, Layer ordnen, messen, und vor allem **pinnen**.
 **Besuchermodus** — über `👥 Besucher` unten in der Icon-Leiste. Beim Wechsel
 passiert dreierlei:
 
-1. Der **Katalog** wird automatisch aus den beweglichen Rampen gebaut.
-   Baugleiche Rampen (gleiche Maße, gleiches Netz) werden zu **einem** Eintrag
-   zusammengefasst — fünf identische Quarterpipes ergeben eine Katalogkarte
-   mit dem Vermerk „5× in der Halle“.
+1. Der **Katalog** wird automatisch aus den beweglichen Rampen gebaut — eine
+   Karte je Rampe, eingeordnet nach Ähnlichkeit zu den gepinnten Objekten
+   (siehe *Kategorien* weiter unten).
 2. Alles Feste wird **einheitlich grau**.
-3. Jeder bewegliche Rampen*typ* bekommt eine **eigene Signalfarbe**; Kopien
-   erben die Farbe ihrer Vorlage.
+3. Jede Kategorie bekommt eine **eigene Signalfarbe**, die einzelnen Rampen
+   darin abgestufte Helligkeiten davon.
 
 Der Besucher hat dann nur noch: **Katalog** (Bestandsliste der Halle),
 **Verschieben / Drehen / Entfernen** der farbigen Rampen und den **JSON-Export**.
@@ -152,20 +151,42 @@ geht es zurück; die Layerfarben kehren dabei zurück.
 
 ### Der Katalog als Bestandsliste
 
-Der Katalog zeigt jeden beweglichen Rampentyp der Halle — **auch dann, wenn
-gerade kein Exemplar davon aufgestellt ist**. Entfernt der Besucher eine Rampe,
-wandert sie in den Papierkorb, bleibt aber Teil des Bestands: ihre Karte bleibt
-stehen und zeigt „*n*× herausgenommen".
+Der Katalog führt **jede einzelne bewegliche Rampe** der Halle mit einer eigenen
+Karte — nicht nur einen Vertreter je Typ. Benannt wird nach Kategorie plus
+laufendem Index, also `QTRS 1`, `QTRS 2`, `BNKS 1` … Damit ist jedes Stück
+einzeln ansprechbar. Ein Klick auf die Karte markiert genau diese Rampe in der
+Halle und wählt sie aus (der Gumball steht sofort daran).
+
+Entfernt der Besucher eine Rampe, wandert sie in den Papierkorb, bleibt aber
+Teil des Bestands: **ihre Karte bleibt stehen** und lässt sich zurücklegen.
 
 | Element der Karte | Bedeutung |
 |---|---|
-| „9× in der Halle" | so viele Exemplare stehen gerade im Entwurf |
-| „3× herausgenommen" | so viele liegen im Papierkorb bereit |
-| **↩ Zurücklegen (3)** | holt das zuletzt entfernte Exemplar an seine alte Stelle zurück |
-| ausgegraute Karte | von diesem Typ steht gerade nichts in der Halle |
+| „in der Halle" | steht gerade im Entwurf |
+| „herausgenommen" / „liegt im Papierkorb" | wurde entfernt |
+| **↩ Zurücklegen** | holt genau diese Rampe an ihre alte Stelle zurück |
+| ausgegraute Karte | steht gerade nicht in der Halle |
 
-Über der Kartenliste filtert eine Leiste den Bestand: **Alle · In der Halle ·
-Entfernt**. So sieht man auf einen Blick, was man beiseitegelegt hat.
+Zwei Filter greifen zusammen:
+
+- **Zustand:** Alle · In der Halle · Entfernt
+- **Typ:** Chips mit Farbpunkt und Anzahl je Kategorie — beliebig viele
+  gleichzeitig wählbar. Keiner gewählt = alle Typen.
+
+> An `spotSkatehalle_IST.3dm` geprüft (Szenario „Mobile Ramps beweglich"):
+> 20 bewegliche Rampen ergeben **20 Karten**, filterbar nach 4 Typen
+> (BNKS 6, Flats/Ebenen 12, QTRS 1, Walls 1). Vorher waren es 4 Karten für
+> 20 Rampen.
+
+### Ansichtsfenster folgen dem Katalog
+
+Ist ein Drawer offen, rücken die 3D-Ansichten nach rechts, sodass sich Katalog
+und Ansichtsfenster **nicht überlappen** — beim Ziehen am Breiten-Anfasser
+laufen sie live mit, beim Schließen nehmen sie die Fläche wieder ein. Technisch
+verschiebt eine CSS-Variable `--stage-left` die drei deckungsgleichen Ebenen
+(`#viewport`, `#paneOverlay`, `#measureLabels`) gemeinsam; `paneRect()` rechnet
+dadurch automatisch mit der kleineren Fläche. Am Handy bleibt es beim Overlay —
+dort wäre für die 3D-Ansicht sonst kein Platz.
 
 ### Tutorial
 
