@@ -455,23 +455,25 @@
        das Raster folgt der Breite von selbst (1-n Spalten) statt zu quetschen.
        grid-auto-rows: auto — mit 1fr wurden alle Zeilen auf gleiche Höhe gezwungen und
        die Textzeilen darunter zusammengequetscht. */
-    grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
     grid-auto-rows: auto; gap: 14px; align-content: start;
+    /* align-items: start — jede Karte ist genau so hoch wie ihr Inhalt und
+       bekommt keine Zeilenhöhe aufgezwungen, an der sie sich strecken müsste. */
+    align-items: start;
   }
+  /* Die Karte ist bewusst KEIN Flex-Container.
+     Vorher war sie eine Flex-Spalte: dort dürfen Kinder schrumpfen, das
+     Vorschaubild aber nicht — sobald die Kartenhöhe irgendwo begrenzt wurde,
+     blieb das Bild stehen und Name, Maße und Button wurden auf Höhe 0
+     zusammengedrückt (bei overflow: hidden also unsichtbar). Im normalen
+     Blockfluss gibt es kein Schrumpfen: jedes Kind nimmt zwingend seine
+     Inhaltshöhe ein und die Karte wächst mit. */
   .cat-card {
-    display: flex; flex-direction: column; background: var(--panel-2); border: 1px solid var(--line);
+    display: block; background: var(--panel-2); border: 1px solid var(--line);
     border-top-width: 4px; border-radius: 12px; overflow: hidden;
+    padding-bottom: 10px;
     transition: transform .18s var(--ease-snap), box-shadow .18s var(--ease-snap);
   }
-  /* WICHTIG: In einer Flex-Spalte dürfen Kinder standardmäßig schrumpfen
-     (flex: 0 1 auto). Das Vorschaubild tut das nicht (flex: 0 0 auto) — sobald
-     die Kartenhöhe von außen begrenzt wird, werden deshalb ausgerechnet Name,
-     Maße und Button auf Höhe 0 zusammengedrückt und die Karte zeigt nur noch
-     das Bild. Darum hier explizit: nichts auf der Karte schrumpft. */
-  .cat-card > * { flex: 0 0 auto; }
-  /* Und die Karte bringt ihre Inhaltshöhe selbst mit, statt sie von der
-     Rasterzeile vorgeschrieben zu bekommen. */
-  .cat-card { min-height: max-content; }
   .cat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,.35); }
   .cat-card.armed { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(232,163,61,.22); }
   /* Gestaffeltes Einblenden beim Öffnen des Drawers / Seitenwechsel (animation-delay
@@ -481,13 +483,13 @@
   .cat-card-thumb {
     /* feste Höhe statt 1:1 — sonst frisst das quadratische Bild in schmalen Spalten
        die ganze Karte und die Infozeilen bleiben unleserlich. */
-    height: 104px; flex: 0 0 auto; background: var(--panel);
+    height: 104px; background: var(--panel);
     display: flex; align-items: center; justify-content: center;
   }
   .cat-card-thumb img { width: 100%; height: 100%; object-fit: contain; }
   .cat-card-name {
-    width: auto; min-height: 26px; box-sizing: border-box;
-    font-size: 13.5px; font-weight: 700; margin: 9px 9px 0; padding: 4px 6px;
+    display: block; width: calc(100% - 18px); box-sizing: border-box;
+    font-size: 13.5px; font-weight: 700; margin: 9px 9px 0; padding: 5px 6px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     background: rgba(255,255,255,.04); border: 1px solid transparent; border-radius: 6px;
     color: var(--text); font-family: inherit;
@@ -495,16 +497,20 @@
   .cat-card-name { transition: background .15s var(--ease-snap), border-color .15s var(--ease-snap); }
   .cat-card-name:hover { border-color: var(--line); }
   .cat-card-name:focus { background: var(--panel); border-color: var(--accent); }
+  /* Zustand als Pille — auf einen Blick erkennbar, ohne lesen zu müssen */
   .cat-card-count {
-    font-size: 11px; font-weight: 600; color: var(--accent); padding: 4px 10px 0; cursor: pointer;
+    display: inline-block; margin: 8px 10px 0; padding: 3px 9px; border-radius: 20px;
+    font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    background: rgba(123,196,127,.16); color: var(--accent-2); cursor: pointer;
   }
+  .cat-card.leer .cat-card-count { background: rgba(255,122,92,.16); color: var(--danger); }
   /* Maße der Rampe — Länge, Breite, Höhe als eigene Zeile mit Beschriftung */
   .cat-card-dims {
-    display: flex; gap: 8px; padding: 6px 10px 0;
-    font-size: 11px; color: var(--text); font-variant-numeric: tabular-nums;
+    display: flex; flex-wrap: wrap; gap: 4px 9px; padding: 7px 10px 0;
+    font-size: 11.5px; color: var(--text); font-variant-numeric: tabular-nums;
   }
-  .cat-card-dims span { display: flex; gap: 3px; align-items: baseline; }
-  .cat-card-dims b { font-weight: 700; color: var(--muted); font-size: 9.5px; text-transform: uppercase; }
+  .cat-card-dims span { display: inline-flex; gap: 3px; align-items: baseline; }
+  .cat-card-dims b { font-weight: 700; color: var(--muted); font-size: 9.5px; letter-spacing: .04em; }
   .cat-drawer-nav {
     flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 14px;
     padding: 10px; border-top: 1px solid var(--line); background: var(--panel-2); font-size: 12px; color: var(--muted);
@@ -762,9 +768,10 @@
   /* Rampentyp, von dem gerade kein Exemplar in der Halle steht */
   .cat-card.leer { opacity: .62; }
   .cat-card.leer .cat-card-thumb img { filter: grayscale(1); }
-  .cat-card-gone { font-size: 11px; font-weight: 600; color: var(--danger); padding: 3px 10px 0; }
+  .cat-card-gone { font-size: 10.5px; color: var(--muted); padding: 5px 10px 0; font-style: italic; }
   .cat-card-back {
-    margin: 10px; margin-top: auto; cursor: pointer; background: var(--accent-2); color: #17191d;
+    display: block; width: calc(100% - 20px); margin: 10px 10px 0;
+    cursor: pointer; background: var(--accent-2); color: #17191d;
     border: none; border-radius: 7px; font-size: 12px; font-weight: 700; padding: 9px; white-space: nowrap;
     transition: background .15s var(--ease-snap), transform .12s var(--ease-snap);
   }
@@ -5128,7 +5135,7 @@
       var drin = catPlacedCount(c.cid), raus = catRemovedCount(c.cid);
       if (!drin) card.classList.add('leer');
       var cnt = document.createElement('div'); cnt.className = 'cat-card-count';
-      cnt.textContent = drin ? 'in der Halle' : 'herausgenommen';
+      cnt.textContent = drin ? 'In der Halle' : 'Herausgenommen';
 
       // Maße aus der Katalog-Geometrie: Länge, Breite, Höhe — je beschriftet,
       // damit klar ist, welche Zahl wofür steht.
@@ -5155,13 +5162,17 @@
       // Es werden bewusst KEINE neuen Rampen erzeugt — der Besucher arbeitet nur
       // mit dem vorhandenen Bestand. Der Button holt ein herausgenommenes
       // Exemplar an seine alte Stelle zurück.
-      var add = document.createElement('button'); add.className = 'cat-card-back';
-      add.textContent = raus ? '↩ Zurücklegen' : 'Steht in der Halle';
-      add.disabled = !raus;
-      add.addEventListener('click', function (ev) {
-        ev.stopPropagation();
-        restoreFromCatalog(c.cid);
-      });
+      // Button nur, wenn er etwas bewirkt — eine deaktivierte Schaltfläche
+      // „Steht in der Halle" kostete nur Platz.
+      var add = null;
+      if (raus) {
+        add = document.createElement('button'); add.className = 'cat-card-back';
+        add.textContent = '↩ Zurücklegen';
+        add.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          restoreFromCatalog(c.cid);
+        });
+      }
 
       card.dataset.cid = c.cid;
       if (catMarkCid === c.cid) card.classList.add('marked');
@@ -5176,7 +5187,7 @@
       card.appendChild(thumb); card.appendChild(nm); card.appendChild(dims);
       card.appendChild(cnt);
       if (raus) card.appendChild(gone);
-      card.appendChild(add);
+      if (add) card.appendChild(add);
       grid.appendChild(card);
     });
   }
