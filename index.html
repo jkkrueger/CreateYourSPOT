@@ -817,6 +817,26 @@
   .cat-chip.on { color: var(--text); border-color: var(--muted); background: #272c33; }
   .cat-chip i { width: 9px; height: 9px; border-radius: 50%; display: block; font-style: normal; }
   .cat-chip small { color: #5e646d; font-weight: 500; }
+  .cat-chip .chip-del {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 11px; padding: 0 0 0 2px; line-height: 1;
+  }
+  .cat-chip .chip-del:hover { color: var(--danger); }
+
+  /* Neuen Layer anlegen — gehört zum Katalog, nicht ins Menü */
+  .cat-newlayer {
+    flex: 0 0 auto; display: flex; gap: 6px; padding: 0 16px 10px;
+    background: var(--panel-2); border-bottom: 1px solid var(--line);
+  }
+  .cat-newlayer input {
+    flex: 1; min-width: 0; background: var(--panel); color: var(--text);
+    border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; font-size: 12px;
+  }
+  .cat-newlayer input:focus { outline: none; border-color: var(--accent); }
+  .cat-newlayer button {
+    flex: 0 0 auto; width: 34px; cursor: pointer; background: var(--accent); color: #17191d;
+    border: none; border-radius: 7px; font-size: 15px; font-weight: 700;
+  }
   /* Drag & Drop: Karte auf einen Typ-Chip ziehen ordnet sie dort ein */
   .cat-card[draggable="true"] { cursor: grab; }
   .cat-card.dragging { opacity: .45; cursor: grabbing; }
@@ -827,34 +847,6 @@
     border-style: solid; border-color: var(--accent-2); color: var(--accent-2);
     background: rgba(123,196,127,.14); transform: scale(1.06);
   }
-
-  /* ── Besucher-Layer (eigene Gruppierung, unabhängig von den Rhino-Layern) ── */
-  .vl-new { display: flex; gap: 6px; margin-bottom: 8px; }
-  .vl-new input {
-    flex: 1; min-width: 0; background: var(--panel-2); color: var(--text);
-    border: 1px solid var(--line); border-radius: 7px; padding: 8px 9px; font-size: 12.5px;
-  }
-  .vl-new input:focus { outline: none; border-color: var(--accent); }
-  .vl-new button {
-    flex: 0 0 auto; width: 38px; cursor: pointer; background: var(--accent); color: #17191d;
-    border: none; border-radius: 7px; font-size: 16px; font-weight: 700;
-  }
-  .vl-row {
-    display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 5px;
-    background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
-    transition: border-color .15s var(--ease-snap), background .15s var(--ease-snap);
-  }
-  .vl-row:hover { background: #272c33; border-color: var(--muted); }
-  .vl-row.active { border-color: var(--accent); }
-  .vl-row .vl-name { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .vl-row .vl-count {
-    flex: 0 0 auto; font-size: 10.5px; font-weight: 700; color: var(--accent);
-    background: rgba(232,163,61,.14); border-radius: 10px; padding: 2px 7px;
-  }
-  .vl-row .vl-del { flex: 0 0 auto; background: none; border: none; color: var(--muted);
-    cursor: pointer; font-size: 13px; padding: 2px 4px; border-radius: 5px; }
-  .vl-row .vl-del:hover { color: var(--danger); }
 
   /* Layer-Auswahl beim Export */
   .exp-row { display: flex; align-items: center; gap: 9px; padding: 8px 10px; margin-bottom: 5px;
@@ -1192,18 +1184,6 @@
     </div>
 
     <div class="v-sect">
-      <h3>Meine Layer</h3>
-      <div class="vl-new">
-        <input type="text" id="vLayerName" placeholder="Neuer Layer …" maxlength="40">
-        <button id="vLayerAdd" title="Layer anlegen">+</button>
-      </div>
-      <div id="vLayerList"></div>
-      <p class="v-hint">Erst eine Rampe auswählen, dann auf einen Layer tippen — sie wird
-        dort einsortiert. Ist sie schon drin, nimmt derselbe Tipp sie wieder heraus.
-        Beim Speichern kannst du gezielt einzelne Layer exportieren.</p>
-    </div>
-
-    <div class="v-sect">
       <h3>Hilfe</h3>
       <button class="v-btn" id="vTutorial">🎓 Tutorial starten</button>
       <p class="v-hint">Führt dich in sechs Schritten durch die Bedienung — du machst jeden
@@ -1248,6 +1228,10 @@
       <button data-f="entfernt">Entfernt</button>
     </div>
     <div class="cat-types" id="catTypeFilter"></div>
+    <div class="cat-newlayer">
+      <input type="text" id="catNewLayer" placeholder="Neuen Layer anlegen …" maxlength="40">
+      <button id="catNewLayerAdd" title="Layer anlegen">+</button>
+    </div>
     <div class="cat-drawer-grid" id="catDrawerGrid"></div>
     <div class="cat-drawer-nav">
       <button id="catPagePrev" title="Vorherige Seite">‹</button>
@@ -2339,7 +2323,7 @@
     // bestehende Szene leeren
     ramps.forEach(function (r) { scene.remove(r.mesh); r.mesh.geometry.dispose(); r.mesh.material.dispose(); });
     ramps = []; selectedId = null;
-    visLayers.length = 0;   // Besucher-Layer gehoeren zur alten Datei
+    userCats.length = 0;    // eigene Layer gehoeren zur alten Datei
     // Undo-Historie leeren; von gelöschten Objekten zurückgehaltene Meshes freigeben
     undoStack.concat(redoStack).forEach(disposeIfGone);
     undoStack = []; redoStack = []; updateUndoButtons();
@@ -3169,7 +3153,6 @@
       status(selIds.length + ' Objekte ausgewählt — Pfeil ziehen oder WASD verschiebt die ganze Gruppe.');
     }
     if (tut && selectedId) tutNotify('select', selectedId);
-    if (visitorMode) renderVLayerList();   // markiert den Layer der neuen Auswahl
   }
   function selectRamp(id, openPopup) { setSelection(id ? [id] : [], id, openPopup); }
   function toggleSelect(id) {
@@ -4627,8 +4610,8 @@
         typeName: r.name,
         group: l ? l.name : 'Unknown',
         layer: l ? (l.fullPath || l.name) : r.layer,
-        // Vom Besucher selbst vergebener Layer (null = keiner)
-        visitorLayer: r.vLayer || null,
+        // Gruppe, unter der das Objekt exportiert wurde (Kategorie bzw. eigener Layer)
+        visitorLayer: exportGroupOf(r),
         mobile: false,
         estimated: true,
         position: { x: Math.round(r.mesh.position.x), y: Math.round(r.mesh.position.y), z: Math.round(r.mesh.position.z) },
@@ -5108,8 +5091,13 @@
       if (typen.indexOf(t) === -1) { typen.push(t); farbe[t] = c.catColor != null ? c.catColor : c.visColor; }
       anzahl[t] = (anzahl[t] || 0) + 1;
     });
+    // Selbst angelegte Layer auch dann zeigen, wenn noch keine Karte drin liegt —
+    // sonst gäbe es kein Ziel, auf das man die erste Karte ziehen könnte.
+    userCats.forEach(function (t) {
+      if (typen.indexOf(t) === -1) { typen.push(t); anzahl[t] = 0; }
+    });
     box.innerHTML = '';
-    if (typen.length < 2) return;   // ein einziger Typ braucht keinen Filter
+    if (!typen.length) return;
     box.title = 'Antippen filtert · eine Karte hierher ziehen ordnet sie dieser Kategorie zu';
     typen.forEach(function (t) {
       var b = document.createElement('button');
@@ -5120,6 +5108,17 @@
       var lbl = document.createElement('span'); lbl.textContent = t;
       var num = document.createElement('small'); num.textContent = anzahl[t];
       b.appendChild(dot); b.appendChild(lbl); b.appendChild(num);
+      // Nur selbst angelegte Layer lassen sich wieder entfernen
+      if (userCats.indexOf(t) !== -1) {
+        var del = document.createElement('button');
+        del.className = 'chip-del'; del.textContent = '✕';
+        del.title = 'Layer löschen — die Rampen bleiben erhalten';
+        del.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          removeUserCat(t);
+        });
+        b.appendChild(del);
+      }
       b.addEventListener('click', function () {
         var i = catTypes.indexOf(t);
         if (i === -1) catTypes.push(t); else catTypes.splice(i, 1);
@@ -5552,75 +5551,41 @@
   }
 
   // ═════════════════════════════════════════════════════════════════
-  //  Besucher-Layer: eigene Gruppierung neben den Rhino-Layern.
-  //  Bewusst ein eigenes Feld (r.vLayer) statt r.layer zu überschreiben —
-  //  sonst ginge die Kategorie-Zuordnung und damit die Einfärbung verloren.
-  //  Genau ein Layer je Rampe; erneutes Antippen nimmt sie wieder heraus.
+  //  Eigene Layer des Besuchers.
+  //  Sie sind schlicht zusätzliche KATEGORIEN: angelegt wird direkt im
+  //  Katalog, zugeordnet per Drag & Drop einer Karte auf den Chip. Damit gibt
+  //  es nur ein Ordnungsprinzip statt zweier nebeneinander — Filter, Farbe
+  //  und Export-Gruppe greifen automatisch.
   // ═════════════════════════════════════════════════════════════════
-  var visLayers = [];   // Namen, Reihenfolge = Anzeigereihenfolge
+  var userCats = [];   // selbst angelegte Kategorien, auch noch leere
 
-  function vLayerCount(name) {
-    return ramps.filter(function (r) { return r.vLayer === name; }).length;
-  }
-
-  function renderVLayerList() {
-    var box = document.getElementById('vLayerList');
-    if (!box) return;
-    box.innerHTML = '';
-    if (!visLayers.length) {
-      box.innerHTML = '<div class="v-empty">Noch keine Layer. Oben einen Namen eingeben und auf + tippen.</div>';
-      return;
-    }
-    var sel = findRamp(selectedId);
-    visLayers.forEach(function (name) {
-      var row = document.createElement('div');
-      row.className = 'vl-row' + (sel && sel.vLayer === name ? ' active' : '');
-      row.title = sel ? 'Auswahl hier einsortieren / herausnehmen' : 'Erst eine Rampe auswählen';
-
-      var nm = document.createElement('div'); nm.className = 'vl-name'; nm.textContent = name;
-      var ct = document.createElement('span'); ct.className = 'vl-count'; ct.textContent = vLayerCount(name);
-      var del = document.createElement('button'); del.className = 'vl-del';
-      del.textContent = '✕'; del.title = 'Layer löschen (Rampen bleiben erhalten)';
-
-      del.addEventListener('click', function (ev) {
-        ev.stopPropagation();
-        ramps.forEach(function (r) { if (r.vLayer === name) r.vLayer = null; });
-        visLayers = visLayers.filter(function (x) { return x !== name; });
-        renderVLayerList();
-        status('Layer „' + name + '" gelöscht — die Rampen selbst bleiben.');
-      });
-
-      row.addEventListener('click', function () { assignSelectionToVLayer(name); });
-      row.appendChild(nm); row.appendChild(ct); row.appendChild(del);
-      box.appendChild(row);
-    });
-  }
-
-  function assignSelectionToVLayer(name) {
-    var ids = selIds.length ? selIds.slice() : (selectedId ? [selectedId] : []);
-    if (!ids.length) { status('Erst eine Rampe auswählen, dann den Layer antippen.'); return; }
-    // Sind alle schon drin → heraus, sonst alle hinein
-    var alleDrin = ids.every(function (id) { var r = findRamp(id); return r && r.vLayer === name; });
-    ids.forEach(function (id) {
-      var r = findRamp(id); if (!r) return;
-      r.vLayer = alleDrin ? null : name;
-    });
-    renderVLayerList();
-    status(alleDrin
-      ? ids.length + ' Rampe(n) aus „' + name + '" entfernt.'
-      : ids.length + ' Rampe(n) in „' + name + '" einsortiert.');
-  }
-
-  function addVLayer() {
-    var inp = document.getElementById('vLayerName');
+  function addUserCat() {
+    var inp = document.getElementById('catNewLayer');
     if (!inp) return;
     var name = (inp.value || '').trim();
     if (!name) { status('Bitte einen Namen für den Layer eingeben.'); return; }
-    if (visLayers.indexOf(name) !== -1) { status('Diesen Layer gibt es schon.'); return; }
-    visLayers.push(name);
+    var vorhanden = userCats.indexOf(name) !== -1 ||
+      catalog.some(function (c) { return c.cat === name; });
+    if (vorhanden) { status('„' + name + '" gibt es schon.'); return; }
+    userCats.push(name);
     inp.value = '';
-    renderVLayerList();
-    status('Layer „' + name + '" angelegt — jetzt Rampen auswählen und antippen.');
+    renderVisitorCatalog();
+    status('Layer „' + name + '" angelegt — jetzt Karten darauf ziehen.');
+  }
+
+  function removeUserCat(name) {
+    userCats = userCats.filter(function (x) { return x !== name; });
+    // Rampen darin fallen auf die automatische Einordnung zurück
+    var betroffen = 0;
+    ramps.concat(trash.map(function (t) { return t.ramp; })).forEach(function (r) {
+      if (r.catOverride === name) { r.catOverride = null; betroffen++; }
+    });
+    catTypes = catTypes.filter(function (x) { return x !== name; });
+    buildVisitorCatalog();
+    applyVisitorColors();
+    renderVisitorCatalog();
+    status('Layer „' + name + '" gelöscht' +
+      (betroffen ? ' — ' + betroffen + ' Rampe(n) wieder automatisch eingeordnet.' : '.'));
   }
 
   // ═════════════════════════════════════════════════════════════════
@@ -5628,11 +5593,11 @@
   // ═════════════════════════════════════════════════════════════════
   // Jede Rampe gehört zu GENAU EINER Exportgruppe — so bleibt die Auswahl
   // eindeutig. Reihenfolge der Zuständigkeit:
-  //   1. selbst angelegter Besucher-Layer (r.vLayer)
-  //   2. sonst die Katalog-Kategorie (QTRS, BNKS, … — auch per Drag & Drop änderbar)
-  //   3. sonst der Layer aus der Rhino-Datei (gilt für die festen Elemente)
+  //   1. die Katalog-Kategorie (QTRS, BNKS, … oder ein selbst angelegter Layer;
+  //      per Drag & Drop änderbar)
+  //   2. sonst der Layer aus der Rhino-Datei (gilt für die festen Elemente)
   function exportGroupOf(r) {
-    if (r.vLayer) return r.vLayer;
+    if (r.catOverride) return r.catOverride;
     for (var i = 0; i < catalog.length; i++) {
       if (catalog[i].cid === r.visCid && catalog[i].cat) return catalog[i].cat;
     }
@@ -5705,10 +5670,10 @@
       try { openExportModal(); } catch (err) { status('JSON-Export fehlgeschlagen: ' + err.message); console.error(err); }
     });
 
-    var la = byId('vLayerAdd'); if (la) la.addEventListener('click', addVLayer);
-    var li = byId('vLayerName');
+    var la = byId('catNewLayerAdd'); if (la) la.addEventListener('click', addUserCat);
+    var li = byId('catNewLayer');
     if (li) li.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Enter') { ev.preventDefault(); addVLayer(); }
+      if (ev.key === 'Enter') { ev.preventDefault(); addUserCat(); }
       ev.stopPropagation();
     });
     var eo = byId('expOk'); if (eo) eo.addEventListener('click', runExportFromModal);
@@ -5724,7 +5689,6 @@
     var ex2 = byId('expClose'); if (ex2) ex2.addEventListener('click', function () {
       byId('expModal').classList.remove('show');
     });
-    renderVLayerList();
 
     var u = byId('vUndo'); if (u) u.addEventListener('click', doUndo);
     var rd = byId('vRedo'); if (rd) rd.addEventListener('click', doRedo);

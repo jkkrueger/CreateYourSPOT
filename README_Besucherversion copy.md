@@ -264,7 +264,7 @@ deterministisch, ohne Training und nachvollziehbar dokumentierbar.
 > Walls kaum (20–29 %). Die Einordnung ist damit eine **Vorsortierung, keine
 > sichere Klassifikation** — die Verwechslungen passieren überwiegend zwischen
 > ohnehin ähnlichen Familien (BNKS ↔ QTRS ↔ Flats). Wer eine exakte Gruppierung
-> braucht, zieht die Karten im Katalog per Drag & Drop auf den richtigen Chip.
+> braucht, korrigiert sie über *Meine Layer*.
 >
 > Grund für die Grenze: die Objekte der Datei tragen **keine Namen**, es gibt also
 > außer Layer und Geometrie keine Information. Sprechende Objektnamen in Rhino
@@ -273,18 +273,13 @@ deterministisch, ohne Training und nachvollziehbar dokumentierbar.
 Ohne gepinnte Rampen gibt es keine Vergleichsbasis — dann gruppiert die App wie
 zuvor nach exakt gleicher Form und weist in der Statuszeile darauf hin.
 
-### Eigene Layer anlegen
+### Meine Layer (Besuchermodus)
 
-Eigene Layer entstehen **direkt im Katalog**, gleich unter der Chip-Leiste:
-Name eingeben, **+** — fertig. Der neue Layer erscheint sofort als Chip, auch
-solange er noch leer ist, und Karten lassen sich per Drag & Drop darauf ziehen.
-Das ✕ am Chip löscht ihn wieder; die Rampen darin fallen dann auf ihre
-automatische Einordnung zurück.
-
-> Ein eigener Layer ist technisch schlicht eine weitere **Kategorie**. Dadurch
-> gibt es nur ein Ordnungsprinzip statt zweier nebeneinander: Filter, Einfärbung
-> und Export-Gruppe greifen automatisch, ohne dass man zwei Systeme im Kopf
-> behalten muss. Die Rhino-Layer der Datei bleiben davon unberührt.
+Über *☰ Menü → Meine Layer* legt der Besucher eigene Gruppen an: Name eingeben,
+**+**, dann eine Rampe auswählen und den Layer antippen. Erneutes Antippen nimmt
+sie wieder heraus, das ✕ löscht den Layer (die Rampen bleiben erhalten). Jede
+Rampe gehört zu höchstens einem Besucher-Layer; die Rhino-Layer bleiben davon
+unberührt, damit Kategorie und Einfärbung erhalten bleiben.
 
 ### Export nach Layern
 
@@ -292,9 +287,9 @@ Beim **JSON-Export** fragt die App, welche Gruppen mitsollen — jede mit
 Objektzahl zum Anhaken, dazu ein „Alle / keine"-Schalter. Jede Rampe gehört zu
 **genau einer** Gruppe, damit die Auswahl eindeutig bleibt:
 
-1. die Katalog-Kategorie — automatisch vergeben (`QTRS`, `BNKS` …) oder ein
-   selbst angelegter Layer; per Drag & Drop jederzeit änderbar
-2. sonst der Layer aus der Rhino-Datei (das betrifft die festen Elemente)
+1. der selbst angelegte Besucher-Layer, falls gesetzt
+2. sonst die Katalog-Kategorie (`QTRS`, `BNKS` … — per Drag & Drop änderbar)
+3. sonst der Layer aus der Rhino-Datei (das betrifft die festen Elemente)
 
 Im JSON steht der Besucher-Layer je Element zusätzlich unter `visitorLayer`.
 
