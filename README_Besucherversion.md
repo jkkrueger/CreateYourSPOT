@@ -13,37 +13,15 @@ Ausführliche Bedienung: `Tutorial_Skatepark_Planer.txt`.
 Läuft direkt im Browser — auch am Handy, ohne Installation und ohne lokalen
 Server. Die hinterlegte Skatehalle wird beim Öffnen automatisch geladen.
 
-> Erster Aufruf lädt rund 5 MB (rhino3dm, three.js, die `.3dm`). Im WLAN
-> unkritisch, über Mobilfunk kurz spürbar.
+> Erster Aufruf lädt rund 5 MB (rhino3dm, three.js, die `.3dm`).
 
 ---
 
 ## Die hinterlegte Halle (Auto-Load)
 
 Beim Start lädt die App automatisch die Datei, die in `samples/index.json` mit
-`"default": true` markiert ist — in Betreiber- **und** Besuchermodus. Niemand
-muss also erst eine Datei auswählen.
+`"default": true` markiert ist.
 
-**Eine andere Halle hinterlegen:**
-
-1. Die `.3dm` nach `samples/` kopieren (mit Render-Meshes, siehe Abschnitt unten).
-2. In `samples/index.json` eintragen und `"default": true` dorthin verschieben:
-
-```json
-[
-  { "file": "meineHalle.3dm", "name": "Halle 2026", "default": true },
-  { "file": "spotSkatehalle_IST.3dm", "name": "Skatehalle – IST-Zustand" }
-]
-```
-
-Alle Einträge erscheinen zusätzlich im Panel *📁 Datei* unter **Hinterlegte
-Dateien** und lassen sich dort per Klick umschalten. Ohne `"default"` wird der
-erste Eintrag geladen.
-
-> Auto-Load braucht HTTP(S) — per Doppelklick (`file://`) blockiert der Browser
-> das Nachladen. Dann über die Online-Version oder einen lokalen Server starten.
-
----
 
 ## Starten
 
@@ -53,12 +31,6 @@ erste Eintrag geladen.
 
 Der Browser öffnet die Seite über `file://`. Three.js und der GLTF-Exporter
 werden dabei lokal aus `vendor/` geladen, **rhino3dm jedoch aus dem Internet**.
-Grund: rhino3dm besteht aus einer WebAssembly-Datei (`rhino3dm.wasm`), die per
-`fetch()` nachgeladen wird — und das ist auf `file://`-Seiten aus
-Sicherheitsgründen von jedem Browser blockiert.
-
-→ Ohne Internetverbindung funktioniert in dieser Variante der **.3dm-Import
-nicht**. Die Statuszeile weist beim Start darauf hin.
 
 ### Variante B — lokaler Server (empfohlen, komplett offline)
 
@@ -88,12 +60,8 @@ PowerShell:
 powershell -ExecutionPolicy Bypass -File .\Start_Offline.ps1
 ```
 
-**B3 — Batch-Datei**
 
-Doppelklick auf `Start_Offline.bat` (einfachste Variante, funktioniert aber
-nicht auf allen Systemen zuverlässig).
-
-> Voraussetzung für alle drei Wege: Python ist installiert
+> Voraussetzung für erfolgreichen Start: Python ist installiert
 > (`python --version` in PowerShell prüfen).
 > Alternativ tut es jeder andere lokale Webserver, z. B. die VS-Code-Erweiterung
 > „Live Server".
@@ -103,19 +71,12 @@ nicht auf allen Systemen zuverlässig).
 ## ⚠️ Wichtig: `.3dm` mit Render-Meshes speichern
 
 Die App zeigt eine `.3dm` nur, wenn deren Objekte **Netze (Meshes)** enthalten.
-Frisch in Grasshopper gebakte Geometrie hat oft noch keine — dann erscheinen
-die Rampen beim Laden **leer bzw. unsichtbar** (die App meldet
-„⚠ n Flächen ohne Render-Mesh" und rekonstruiert sie nur notdürftig).
 
-**So geht der Kreislauf sauber auf:** nach dem Baken in Rhino einmal in eine
+**So geht der Kreislauf sauber auf:** nach dem zeichnen in Rhino einmal in eine
 **gerenderte / schattierte Ansicht** wechseln (das erzeugt die Render-Meshes)
 und die **`.3dm` speichern**. Erst dann fließt das Ergebnis aus der Pipeline
 wieder verlustfrei in die Besucher-App zurück.
 
-> **Kreislauf:** Grasshopper (Import → Build → Bake) → Rhino →
-> **gerenderte Ansicht + `.3dm` speichern** → Besucher-App lädt die `.3dm`.
-
----
 
 ## Zwei Modi: Betreiber und Besucher
 
@@ -137,9 +98,7 @@ vorbereitet: `.3dm` laden, Layer ordnen, messen, und vor allem **pinnen**.
 **Besuchermodus** — über `👥 Besucher` unten in der Icon-Leiste. Beim Wechsel
 passiert dreierlei:
 
-1. Der **Katalog** wird automatisch aus den beweglichen Rampen gebaut — eine
-   Karte je Rampe, eingeordnet nach Ähnlichkeit zu den gepinnten Objekten
-   (siehe *Kategorien* weiter unten).
+1. Der **Katalog** wird automatisch aus den beweglichen Rampen gebaut.
 2. Alles Feste wird **einheitlich grau**.
 3. Jede Kategorie bekommt eine **eigene Signalfarbe**, die einzelnen Rampen
    darin abgestufte Helligkeiten davon.
@@ -150,82 +109,12 @@ Feste Elemente lassen sich weder bewegen noch löschen. Über `← Betreibermodu
 geht es zurück; die Layerfarben kehren dabei zurück.
 
 > **Der Besucher legt keine neuen Rampen an.** Er arbeitet ausschließlich mit
-> dem vorhandenen Bestand der Halle — das Stempeln von Kopien gibt es nur im
-> Betreibermodus (Panel *📚 Katalog*).
-
-### Der Katalog als Bestandsliste
-
-Der Katalog führt **jede einzelne bewegliche Rampe** der Halle mit einer eigenen
-Karte — nicht nur einen Vertreter je Typ. Benannt wird nach Kategorie plus
-laufendem Index, also `QTRS 1`, `QTRS 2`, `BNKS 1` … Damit ist jedes Stück
-einzeln ansprechbar. Ein Klick auf die Karte markiert genau diese Rampe in der
-Halle und wählt sie aus (der Gumball steht sofort daran).
-
-Entfernt der Besucher eine Rampe, wandert sie in den Papierkorb, bleibt aber
-Teil des Bestands: **ihre Karte bleibt stehen** und lässt sich zurücklegen.
-
-| Element der Karte | Bedeutung |
-|---|---|
-| „in der Halle" | steht gerade im Entwurf |
-| „herausgenommen" / „liegt im Papierkorb" | wurde entfernt |
-| **↩ Zurücklegen** | holt genau diese Rampe an ihre alte Stelle zurück |
-| ausgegraute Karte | steht gerade nicht in der Halle |
-
-Zwei Filter greifen zusammen:
-
-- **Zustand:** Alle · In der Halle · Entfernt
-- **Typ:** Chips mit Farbpunkt und Anzahl je Kategorie — beliebig viele
-  gleichzeitig wählbar. Keiner gewählt = alle Typen.
+> dem vorhandenen Bestand der Halle.
 
 **Kategorie per Drag & Drop ändern:** Eine Karte auf einen Typ-Chip ziehen
 ordnet die Rampe dieser Kategorie zu und übernimmt deren Farbe. Diese
-Zuweisung schlägt die automatische Einordnung dauerhaft — praktisch, um die
-Treffer des Ähnlichkeitsverfahrens zu korrigieren.
+Zuweisung schlägt die automatische Einordnung dauerhaft.
 
-**Namen bleiben manuell.** Der vorgeschlagene Name (`QTRS 1`, `BNKS 2` …) lässt
-sich im Katalog direkt überschreiben. Ein selbst vergebener Name wird
-**nie automatisch ersetzt** — auch nicht beim Kategoriewechsel. Eine nach
-„QTRS" verschobene Karte behält also ihren Namen, bis du ihn selbst änderst.
-
-> An `spotSkatehalle_IST.3dm` geprüft (Szenario „Mobile Ramps beweglich"):
-> 20 bewegliche Rampen ergeben **20 Karten**, filterbar nach 4 Typen
-> (BNKS 6, Flats/Ebenen 12, QTRS 1, Walls 1). Vorher waren es 4 Karten für
-> 20 Rampen.
-
-### Ansichtsfenster folgen dem Katalog
-
-Ist ein Drawer offen, rücken die 3D-Ansichten nach rechts, sodass sich Katalog
-und Ansichtsfenster **nicht überlappen** — beim Ziehen am Breiten-Anfasser
-laufen sie live mit, beim Schließen nehmen sie die Fläche wieder ein. Technisch
-verschiebt eine CSS-Variable `--stage-left` die drei deckungsgleichen Ebenen
-(`#viewport`, `#paneOverlay`, `#measureLabels`) gemeinsam; `paneRect()` rechnet
-dadurch automatisch mit der kleineren Fläche. Am Handy bleibt es beim Overlay —
-dort wäre für die 3D-Ansicht sonst kein Platz.
-
-### Tutorial
-
-Beim Wechsel in den Besuchermodus fragt die App: *Tutorial anschauen?* Sagt der
-Besucher ja, führt eine Karte am unteren Rand durch **sechs Schritte**, die er
-jeweils selbst ausführen muss — der nächste Schritt schaltet erst frei, wenn die
-Aktion wirklich passiert ist:
-
-1. Ansicht drehen
-2. Grau vs. farbig verstehen (Lesen, weiter per Klick)
-3. Eine **namentlich genannte Rampe suchen und auswählen** — der Typ mit den
-   meisten Exemplaren wird automatisch als Suchziel gewählt
-4. Diese Rampe verschieben
-5. Im Katalog einen Rampentyp markieren
-6. Den Entwurf als JSON speichern (inklusive Layer-Auswahl)
-7. Abschluss mit Hinweis auf Rückgängig
-
-Jederzeit neu startbar über *☰ Menü → Hilfe → 🎓 Tutorial starten*, abbrechbar
-über das ✕ der Karte.
-
-Zu jedem Schritt zeigt ein **animiertes Icon** die passende Geste — am PC mit
-Maus (gedrückte Taste hervorgehoben), am Touchgerät mit Finger. Die Grafiken sind
-Inline-SVG mit CSS-Keyframes, also ohne Bilddateien; bei *prefers-reduced-motion*
-stehen sie automatisch still. Ist ein Schritt gelöst, wechselt das Icon auf einen
-Haken.
 
 ### Bedienhilfen
 
@@ -243,48 +132,14 @@ Haken.
   hindurch (Shift+Tab rückwärts), der gerade gemeinte leuchtet cyan. Ein Klick
   übernimmt genau diesen, nicht den vordersten.
 
-### Kategorien: Einordnung nach Ähnlichkeit
 
-Beim Wechsel in den Besuchermodus vergleicht die App jede **bewegliche** Rampe mit
-den **gepinnten** und ordnet sie der Kategorie (= Layer) der ähnlichsten festen
-Objekte zu. Verfahren: **k-Nearest-Neighbour (k=3)** auf z-standardisierten
-Merkmalen — logarithmierte Maße, Steilheit H/L, Breitenverhältnis B/L und ein
-flächengewichtetes **Neigungshistogramm** der Flächennormalen (waagerecht →
-senkrecht). Das Histogramm ist nötig, weil eine Bounding-Box eine gekrümmte
-Quarterpipe nicht von einer schrägen Bank trennen kann. Liegt nichts näher als
-2,5 Standardabweichungen, landet die Rampe in „Sonstige".
+### Meine Layer (Besuchermodus)
 
-Warum k-NN und nicht k-Means: die Kategorien sind durch das Pinnen bereits
-vorgegeben — es ist ein Zuordnungs-, kein Clusterproblem. k-NN ist dafür
-deterministisch, ohne Training und nachvollziehbar dokumentierbar.
-
-> ⚠️ **Gemessene Genauigkeit:** In einer Leave-one-out-Kreuzvalidierung auf
-> `spotSkatehalle_IST.3dm` trifft die Zuordnung die Layer-Wahrheit in **rund 62 %**
-> der Fälle (Bounding-Box allein: 54 %). Rails werden fast immer erkannt (89–94 %),
-> Walls kaum (20–29 %). Die Einordnung ist damit eine **Vorsortierung, keine
-> sichere Klassifikation** — die Verwechslungen passieren überwiegend zwischen
-> ohnehin ähnlichen Familien (BNKS ↔ QTRS ↔ Flats). Wer eine exakte Gruppierung
-> braucht, zieht die Karten im Katalog per Drag & Drop auf den richtigen Chip.
->
-> Grund für die Grenze: die Objekte der Datei tragen **keine Namen**, es gibt also
-> außer Layer und Geometrie keine Information. Sprechende Objektnamen in Rhino
-> (z. B. „quarterpipe_03") würden die Zuordnung deutlich sicherer machen.
-
-Ohne gepinnte Rampen gibt es keine Vergleichsbasis — dann gruppiert die App wie
-zuvor nach exakt gleicher Form und weist in der Statuszeile darauf hin.
-
-### Eigene Layer anlegen
-
-Eigene Layer entstehen **direkt im Katalog**, gleich unter der Chip-Leiste:
-Name eingeben, **+** — fertig. Der neue Layer erscheint sofort als Chip, auch
-solange er noch leer ist, und Karten lassen sich per Drag & Drop darauf ziehen.
-Das ✕ am Chip löscht ihn wieder; die Rampen darin fallen dann auf ihre
-automatische Einordnung zurück.
-
-> Ein eigener Layer ist technisch schlicht eine weitere **Kategorie**. Dadurch
-> gibt es nur ein Ordnungsprinzip statt zweier nebeneinander: Filter, Einfärbung
-> und Export-Gruppe greifen automatisch, ohne dass man zwei Systeme im Kopf
-> behalten muss. Die Rhino-Layer der Datei bleiben davon unberührt.
+Über *☰ Menü → Meine Layer* legt der Besucher eigene Gruppen an: Name eingeben,
+**+**, dann eine Rampe auswählen und den Layer antippen. Erneutes Antippen nimmt
+sie wieder heraus, das ✕ löscht den Layer (die Rampen bleiben erhalten). Jede
+Rampe gehört zu höchstens einem Besucher-Layer; die Rhino-Layer bleiben davon
+unberührt, damit Kategorie und Einfärbung erhalten bleiben.
 
 ### Export nach Layern
 
@@ -292,9 +147,9 @@ Beim **JSON-Export** fragt die App, welche Gruppen mitsollen — jede mit
 Objektzahl zum Anhaken, dazu ein „Alle / keine"-Schalter. Jede Rampe gehört zu
 **genau einer** Gruppe, damit die Auswahl eindeutig bleibt:
 
-1. die Katalog-Kategorie — automatisch vergeben (`QTRS`, `BNKS` …) oder ein
-   selbst angelegter Layer; per Drag & Drop jederzeit änderbar
-2. sonst der Layer aus der Rhino-Datei (das betrifft die festen Elemente)
+1. der selbst angelegte Besucher-Layer, falls gesetzt
+2. sonst die Katalog-Kategorie (`QTRS`, `BNKS` … — per Drag & Drop änderbar)
+3. sonst der Layer aus der Rhino-Datei (das betrifft die festen Elemente)
 
 Im JSON steht der Besucher-Layer je Element zusätzlich unter `visitorLayer`.
 
