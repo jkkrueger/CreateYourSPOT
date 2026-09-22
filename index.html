@@ -3264,6 +3264,10 @@
       }
 
       // 2) Rampe getroffen? → auswählen (Strg = zur Auswahl hinzufügen/entfernen)
+      // Der gerade im Info-Fenster angezeigte Körper (ggf. per Tab durchgeschaltet)
+      // gilt auch dann, wenn der Cursor ihn nur knapp verfehlt.
+      var tabPick = (hoverPick.shown && hoverPick.ids.length &&
+                     findRamp(hoverPick.ids[hoverPick.idx])) ? hoverPick.ids[hoverPick.idx] : null;
       raycaster.setFromCamera(ndcInPane(e.clientX, e.clientY, hp), hp.pane.camera);
       var meshes = ramps.filter(function (r) { return r.mesh.visible; }).map(function (r) { return r.mesh; });
       var hits = raycaster.intersectObjects(meshes, false);
@@ -3282,6 +3286,11 @@
         }
         if (e.ctrlKey || e.metaKey) toggleSelect(hitId);
         else selectRamp(hitId, true);
+      } else if (tabPick && e.pointerType !== 'touch') {
+        // Der Cursor hat knapp danebengetroffen, das Info-Fenster zeigt aber
+        // einen Körper aus dem Fangradius — dann ist dieser gemeint.
+        if (e.ctrlKey || e.metaKey) toggleSelect(tabPick);
+        else selectRamp(tabPick, true);
       } else if (e.pointerType === 'touch') {
         // Touch auf leeren Raum: Ein-Finger-Orbit (Rechtsklick-Drehen gibt's am Handy nicht;
         // Lasso bleibt Maus/Trackpad vorbehalten). Nutzt dieselbe orbit-Logik wie bindNavigation().
@@ -5282,7 +5291,44 @@
     if (tip) tip.classList.remove('show');
     if (hoverPick.shown) { hoverPick.shown = false; applySelectionVisuals(); }
   }
-  var HOVER_DELAY = 1000;   // ms Mausstillstand, bevor das Tooltip erscheint
+  // Der Fangradius fuer die Tab-Durchschaltung wird erst mit dem Tooltip
+  // freigeschaltet — bei einer Sekunde Wartezeit fuehlte sich das gezielte
+  // Anwaehlen kleiner Koerper zaeh an, daher kuerzer.
+  var HOVER_DELAY = 550;    // ms Mausstillstand, bevor das Tooltip erscheint
+  // ── Fangbereich für die Tab-Durchschaltung ──────────────────────────────
+  //  Ein einzelner Strahl genau unter dem Cursor trifft kleine oder schmale
+  //  Körper (Rails!) kaum. Deshalb wird zusätzlich auf zwei Ringen um den
+  //  Cursor gestrahlt — alles, was dort liegt, kommt mit in den Stapel, durch
+  //  den Tab schaltet. Reihenfolge: erst was direkt unter dem Cursor liegt,
+  //  dann der innere, dann der äußere Ring; innerhalb einer Stufe das Nähere.
+  var PICK_RADIUS = 24;              // px Fangradius um den Mauszeiger
+  var PICK_RINGS = [0.55, 1];        // Anteile von PICK_RADIUS
+  var PICK_SPOKES = 10;              // Strahlen je Ring
+
+  function pickCandidates(clientX, clientY, hp, meshes) {
+    var found = [], seen = {};
+    function schuss(px, py, stufe) {
+      raycaster.setFromCamera(ndcInPane(px, py, hp), hp.pane.camera);
+      var hits = raycaster.intersectObjects(meshes, false);
+      for (var i = 0; i < hits.length; i++) {
+        var id = hits[i].object.userData.rampId;
+        if (!id || seen[id]) continue;
+        seen[id] = true;
+        found.push({ id: id, stufe: stufe, dist: hits[i].distance });
+      }
+    }
+    schuss(clientX, clientY, 0);
+    PICK_RINGS.forEach(function (f, ri) {
+      var r = PICK_RADIUS * f;
+      for (var k = 0; k < PICK_SPOKES; k++) {
+        var a = (k / PICK_SPOKES) * Math.PI * 2;
+        schuss(clientX + Math.cos(a) * r, clientY + Math.sin(a) * r, ri + 1);
+      }
+    });
+    found.sort(function (a, b) { return (a.stufe - b.stufe) || (a.dist - b.dist); });
+    return found.map(function (x) { return x.id; });
+  }
+
   function bindHoverTip() {
     var dom = renderer.domElement;
     dom.addEventListener('pointermove', function (e) {
@@ -5291,22 +5337,15 @@
       hideHoverTip();
       // Gilt in beiden Modi — der Betreiber braucht die Durchschaltung genauso.
       if (lassoDrag || rotDrag || gizmoDrag || measureMode || pendingStamp || orbit) return;
-      var hp = paneAt(e.clientX, e.clientY);
-      if (!hp) return;
-      raycaster.setFromCamera(ndcInPane(e.clientX, e.clientY, hp), hp.pane.camera);
-      var meshes = ramps.filter(function (r) { return r.mesh.visible; }).map(function (r) { return r.mesh; });
-      var hits = raycaster.intersectObjects(meshes, false);
-      if (!hits.length) return;
-      // Alle getroffenen Körper von vorne nach hinten; Mehrfachtreffer derselben
-      // Rampe zusammenfassen. Das ist der Stapel, durch den Tab schaltet.
-      var ids = [];
-      hits.forEach(function (h) {
-        var hid = h.object.userData.rampId;
-        if (hid && ids.indexOf(hid) === -1) ids.push(hid);
-      });
-      if (!ids.length) return;
       var cx = e.clientX, cy = e.clientY;
+      // Bewusst KEIN Raycast bei jeder Mausbewegung: der Fangradius kostet 21
+      // Strahlen, die lohnen sich erst, wenn die Maus wirklich stehen bleibt.
       hoverTimer = setTimeout(function () {
+        var hp = paneAt(cx, cy);
+        if (!hp) return;
+        var meshes = ramps.filter(function (r) { return r.mesh.visible; }).map(function (r) { return r.mesh; });
+        var ids = pickCandidates(cx, cy, hp, meshes);
+        if (!ids.length) return;
         hoverPick.ids = ids; hoverPick.idx = 0; hoverPick.x = cx; hoverPick.y = cy;
         var r0 = findRamp(ids[0]);
         if (r0) showHoverTip(r0, cx, cy);
