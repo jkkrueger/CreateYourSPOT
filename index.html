@@ -832,7 +832,15 @@
     flex: 1; min-width: 0; background: var(--panel); color: var(--text);
     border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; font-size: 12px;
   }
-  .cat-newlayer input:focus { outline: none; border-color: var(--accent); }
+  .cat-newlayer input[type="text"]:focus { outline: none; border-color: var(--accent); }
+  /* Farbwähler: das native Feld auf einen runden Farbpunkt eindampfen */
+  .cat-newlayer input[type="color"] {
+    flex: 0 0 auto; width: 32px; height: 32px; padding: 2px; cursor: pointer;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  }
+  .cat-newlayer input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  .cat-newlayer input[type="color"]::-webkit-color-swatch { border: none; border-radius: 5px; }
+  .cat-newlayer input[type="color"]::-moz-color-swatch { border: none; border-radius: 5px; }
   .cat-newlayer button {
     flex: 0 0 auto; width: 34px; cursor: pointer; background: var(--accent); color: #17191d;
     border: none; border-radius: 7px; font-size: 15px; font-weight: 700;
@@ -1229,6 +1237,7 @@
     </div>
     <div class="cat-types" id="catTypeFilter"></div>
     <div class="cat-newlayer">
+      <input type="color" id="catNewColor" title="Farbe des Layers">
       <input type="text" id="catNewLayer" placeholder="Neuen Layer anlegen …" maxlength="40">
       <button id="catNewLayerAdd" title="Layer anlegen">+</button>
     </div>
@@ -2324,6 +2333,7 @@
     ramps.forEach(function (r) { scene.remove(r.mesh); r.mesh.geometry.dispose(); r.mesh.material.dispose(); });
     ramps = []; selectedId = null;
     userCats.length = 0;    // eigene Layer gehoeren zur alten Datei
+    Object.keys(userCatColor).forEach(function (k) { delete userCatColor[k]; });
     // Undo-Historie leeren; von gelöschten Objekten zurückgehaltene Meshes freigeben
     undoStack.concat(redoStack).forEach(disposeIfGone);
     undoStack = []; redoStack = []; updateUndoButtons();
@@ -4969,7 +4979,11 @@
     }
 
     groups.forEach(function (grp, i) {
-      var col = VIS_PALETTE[i % VIS_PALETTE.length];
+      // Selbst angelegte Layer behalten die beim Anlegen gewählte Farbe,
+      // alle übrigen Kategorien bekommen sie der Reihe nach aus der Palette.
+      var col = (userCatColor[grp.key] != null)
+        ? userCatColor[grp.key]
+        : VIS_PALETTE[i % VIS_PALETTE.length];
       // Der Katalog ist die vollständige Bestandsliste: JEDE bewegliche Rampe
       // bekommt eine eigene Karte. Die Kategorie liefert nur Grundfarbe und
       // Namenspräfix, der laufende Index macht jedes Stück einzeln ansprechbar.
@@ -5053,7 +5067,7 @@
     if (menuTab) menuTab.classList.toggle('active', which === 'menu');
     if (catEl) catEl.classList.toggle('open', which === 'catalog');
     if (catTab) catTab.classList.toggle('active', which === 'catalog');
-    if (which === 'catalog') renderVisitorCatalog();
+    if (which === 'catalog') { renderVisitorCatalog(); resetNewCatColor(); }
     // Reiter-Leiste an die Außenkante des gerade offenen Drawers heften, damit
     // sie nie über dessen Inhalt liegt.
     if (tabs) {
@@ -5094,7 +5108,10 @@
     // Selbst angelegte Layer auch dann zeigen, wenn noch keine Karte drin liegt —
     // sonst gäbe es kein Ziel, auf das man die erste Karte ziehen könnte.
     userCats.forEach(function (t) {
-      if (typen.indexOf(t) === -1) { typen.push(t); anzahl[t] = 0; }
+      if (typen.indexOf(t) === -1) {
+        typen.push(t); anzahl[t] = 0;
+        if (userCatColor[t] != null) farbe[t] = userCatColor[t];
+      }
     });
     box.innerHTML = '';
     if (!typen.length) return;
@@ -5557,7 +5574,26 @@
   //  es nur ein Ordnungsprinzip statt zweier nebeneinander — Filter, Farbe
   //  und Export-Gruppe greifen automatisch.
   // ═════════════════════════════════════════════════════════════════
-  var userCats = [];   // selbst angelegte Kategorien, auch noch leere
+  var userCats = [];        // selbst angelegte Kategorien, auch noch leere
+  var userCatColor = {};    // Name → Farbe, vom Nutzer beim Anlegen gewählt
+
+  // Erste Palettenfarbe, die noch keine Kategorie belegt — als Vorschlag im
+  // Farbfeld, damit zwei Layer nicht versehentlich gleich aussehen.
+  function nextFreeVisColor() {
+    var belegt = {};
+    catalog.forEach(function (c) { if (c.catColor != null) belegt[c.catColor] = true; });
+    Object.keys(userCatColor).forEach(function (k) { belegt[userCatColor[k]] = true; });
+    for (var i = 0; i < VIS_PALETTE.length; i++) {
+      if (!belegt[VIS_PALETTE[i]]) return VIS_PALETTE[i];
+    }
+    return VIS_PALETTE[Object.keys(belegt).length % VIS_PALETTE.length];
+  }
+
+  // Farbfeld auf den nächsten freien Ton stellen
+  function resetNewCatColor() {
+    var cf = document.getElementById('catNewColor');
+    if (cf) cf.value = hex(nextFreeVisColor());
+  }
 
   function addUserCat() {
     var inp = document.getElementById('catNewLayer');
@@ -5568,13 +5604,19 @@
       catalog.some(function (c) { return c.cat === name; });
     if (vorhanden) { status('„' + name + '" gibt es schon.'); return; }
     userCats.push(name);
+    var cf = document.getElementById('catNewColor');
+    if (cf && /^#[0-9a-fA-F]{6}$/.test(cf.value)) {
+      userCatColor[name] = parseInt(cf.value.slice(1), 16);
+    }
     inp.value = '';
     renderVisitorCatalog();
+    resetNewCatColor();   // Vorschlag für den nächsten Layer
     status('Layer „' + name + '" angelegt — jetzt Karten darauf ziehen.');
   }
 
   function removeUserCat(name) {
     userCats = userCats.filter(function (x) { return x !== name; });
+    delete userCatColor[name];
     // Rampen darin fallen auf die automatische Einordnung zurück
     var betroffen = 0;
     ramps.concat(trash.map(function (t) { return t.ramp; })).forEach(function (r) {
@@ -5671,6 +5713,7 @@
     });
 
     var la = byId('catNewLayerAdd'); if (la) la.addEventListener('click', addUserCat);
+    resetNewCatColor();
     var li = byId('catNewLayer');
     if (li) li.addEventListener('keydown', function (ev) {
       if (ev.key === 'Enter') { ev.preventDefault(); addUserCat(); }
