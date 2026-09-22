@@ -743,6 +743,8 @@
   @keyframes tut-ripple  { 0% { transform: scale(.3); opacity: .85; } 100% { transform: scale(2.4); opacity: 0; } }
   @keyframes tut-glow    { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
   @keyframes tut-draw    { 0% { stroke-dashoffset: 42; } 55%, 100% { stroke-dashoffset: 0; } }
+  @keyframes tut-fall    { 0%, 100% { transform: translateY(-5px); opacity: .35; }
+                           50% { transform: translateY(2px); opacity: 1; } }
   @keyframes tut-arc     { 0% { stroke-dashoffset: 46; opacity: 0; } 25% { opacity: 1; }
                            75% { stroke-dashoffset: 0; opacity: 1; } 100% { opacity: 0; } }
 
@@ -815,6 +817,16 @@
   .cat-chip.on { color: var(--text); border-color: var(--muted); background: #272c33; }
   .cat-chip i { width: 9px; height: 9px; border-radius: 50%; display: block; font-style: normal; }
   .cat-chip small { color: #5e646d; font-weight: 500; }
+  /* Drag & Drop: Karte auf einen Typ-Chip ziehen ordnet sie dort ein */
+  .cat-card[draggable="true"] { cursor: grab; }
+  .cat-card.dragging { opacity: .45; cursor: grabbing; }
+  body.cat-dragging .cat-chip {
+    border-style: dashed; border-color: var(--muted); color: var(--text);
+  }
+  .cat-chip.drop {
+    border-style: solid; border-color: var(--accent-2); color: var(--accent-2);
+    background: rgba(123,196,127,.14); transform: scale(1.06);
+  }
 
   /* ── Besucher-Layer (eigene Gruppierung, unabhängig von den Rhino-Layern) ── */
   .vl-new { display: flex; gap: 6px; margin-bottom: 8px; }
@@ -852,6 +864,8 @@
   .exp-row .exp-name { flex: 1; font-size: 12.5px; }
   .exp-row .exp-count { font-size: 10.5px; color: var(--muted); }
   #expModal .modal-box { width: min(420px, calc(100vw - 32px)); }
+  .exp-row.exp-all { background: transparent; border-style: dashed; margin-bottom: 8px; }
+  .exp-row.exp-all .exp-name { font-weight: 700; color: var(--muted); }
   #expList { max-height: 46vh; overflow-y: auto; margin: 4px 0 12px; }
   .cat-card-thumb { cursor: pointer; }
 
@@ -1379,6 +1393,8 @@
     </div>
     <div class="popup-body">
       <p class="hint" style="margin-top:0">Nur die angehakten Layer landen im JSON.</p>
+      <label class="exp-row exp-all"><input type="checkbox" id="expAll" checked>
+        <span class="exp-name">Alle / keine</span></label>
       <div id="expList"></div>
       <div class="modal-actions">
         <button class="btn" id="expCancel">Abbrechen</button>
@@ -2413,8 +2429,12 @@
     mesh.userData.rampId = id;
     mesh.visible = layerByName(layerName) ? layerByName(layerName).visible : true;
     scene.add(mesh);
+    // Standard: alles aus der Datei gilt erst einmal als FEST verbaut. Der
+    // Betreiber gibt gezielt frei, was der Besucher bewegen darf (Pin lösen) —
+    // sicherer herum als andersherum, weil sonst versehentlich die ganze Halle
+    // beweglich wäre.
     ramps.push({ id: id, name: name, layer: layerName, mesh: mesh, rot: 0,
-                 pinned: false, hidden: false, lock: { x: false, y: false, z: false } });
+                 pinned: true, hidden: false, lock: { x: false, y: false, z: false } });
   }
   function findRamp(id) { return ramps.find(function (r) { return r.id === id; }) || null; }
   // Anzeigefarbe: im Betreibermodus die Layerfarbe, im Besuchermodus
@@ -4639,6 +4659,7 @@
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
     status('JSON exportiert (' + elements.length + ' Elemente, inkl. 3D-Meshes) — parametrisch: skatepark_import_v2 · exakte Geometrie: skatepark_import_mesh.');
+    if (tut) tutNotify('export');
   }
 
   // ── GLB-Export: pro Layer eine benannte Gruppe → Blender-Collections ──
@@ -4894,6 +4915,29 @@
   // Wie viele Exemplare eines Katalogeintrags stehen gerade in der Halle,
   // wie viele wurden herausgenommen? Wird bei jedem Rendern frisch gezählt,
   // damit die Karte nach Entfernen/Zurücklegen sofort stimmt.
+  // Die Karte steht 1:1 für eine Rampe — auch für eine herausgenommene.
+  function rampOfEntry(cid) {
+    var alle = ramps.concat(trash.map(function (t) { return t.ramp; }));
+    for (var i = 0; i < alle.length; i++) if (alle[i].visCid === cid) return alle[i];
+    return null;
+  }
+
+  // Rampe einer anderen Kategorie zuordnen (Drag & Drop auf einen Typ-Chip).
+  // Der Name bleibt dabei bewusst unangetastet.
+  function moveEntryToCategory(cid, ziel) {
+    var r = rampOfEntry(cid);
+    if (!r) return;
+    var e = catalog.filter(function (c) { return c.cid === cid; })[0];
+    var alt = e ? e.cat : '';
+    if (alt === ziel) return;
+    if (!r.customName && e) r.customName = e.name;   // Name festhalten, bevor neu nummeriert wird
+    r.catOverride = ziel;
+    buildVisitorCatalog();
+    applyVisitorColors();
+    renderVisitorCatalog();
+    status('„' + (r.customName || 'Rampe') + '" nach „' + ziel + '" verschoben — Farbe angepasst, Name unverändert.');
+  }
+
   function catPlacedCount(cid) {
     return ramps.filter(function (r) { return r.visCid === cid; }).length;
   }
@@ -4928,7 +4972,9 @@
     var cats = categorizeMovables(movable);
     var groups = [], byKey = {};
     movable.forEach(function (r) {
-      var key = cats ? (cats[r.id] || 'Sonstige') : visGeoSig(r);
+      // r.catOverride: vom Nutzer per Drag & Drop zugewiesen — schlägt die
+      // automatische Einordnung immer.
+      var key = r.catOverride || (cats ? (cats[r.id] || 'Sonstige') : visGeoSig(r));
       if (!byKey[key]) { byKey[key] = { key: key, list: [] }; groups.push(byKey[key]); }
       byKey[key].list.push(r);
     });
@@ -4948,7 +4994,10 @@
       grp.list.forEach(function (r, k) {
         var ton = shadeOf(col, k, grp.list.length);
         r.visColor = ton;
-        catAddEntry(praefix + ' ' + (k + 1), r.layer, ton, r.mesh.geometry.clone(),
+        // Ein selbst vergebener Name bleibt erhalten — auch nach einem
+        // Kategoriewechsel per Drag & Drop wird er nicht überschrieben.
+        var label = r.customName || (praefix + ' ' + (k + 1));
+        catAddEntry(label, r.layer, ton, r.mesh.geometry.clone(),
           { x: r.mesh.position.x, y: r.mesh.position.y, z: r.mesh.position.z });
         var entry = catalog[catalog.length - 1];
         entry.visColor = ton;
@@ -5061,6 +5110,7 @@
     });
     box.innerHTML = '';
     if (typen.length < 2) return;   // ein einziger Typ braucht keinen Filter
+    box.title = 'Antippen filtert · eine Karte hierher ziehen ordnet sie dieser Kategorie zu';
     typen.forEach(function (t) {
       var b = document.createElement('button');
       b.className = 'cat-chip' + (catTypes.indexOf(t) !== -1 ? ' on' : '');
@@ -5076,6 +5126,21 @@
         catPage = 0;
         renderVisitorCatalog();
       });
+
+      // Ablagestelle: eine hierher gezogene Karte wechselt die Kategorie
+      b.addEventListener('dragover', function (ev) {
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+        b.classList.add('drop');
+      });
+      b.addEventListener('dragleave', function () { b.classList.remove('drop'); });
+      b.addEventListener('drop', function (ev) {
+        ev.preventDefault();
+        b.classList.remove('drop');
+        var cid = ev.dataTransfer.getData('text/plain');
+        if (cid) moveEntryToCategory(cid, t);
+      });
+
       box.appendChild(b);
     });
   }
@@ -5142,8 +5207,12 @@
         var v = nm.value.trim();
         if (!v) { nm.value = c.name; return; }
         c.name = v;
+        // Am Objekt festhalten, sonst überschreibt der nächste Katalogaufbau
+        // den Namen wieder mit „Kategorie + Index“.
+        var rr = rampOfEntry(c.cid);
+        if (rr) rr.customName = v;
         var img2 = thumb.querySelector('img'); if (img2) img2.alt = v;
-        status('Katalog-Eintrag umbenannt in „' + v + '“.');
+        status('Umbenannt in „' + v + '“ — bleibt auch beim Kategoriewechsel erhalten.');
       });
       nm.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') nm.blur(); ev.stopPropagation(); });
       nm.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
@@ -5192,6 +5261,22 @@
 
       card.dataset.cid = c.cid;
       if (catMarkCid === c.cid) card.classList.add('marked');
+
+      // Ziehen auf einen Typ-Chip ordnet die Rampe dieser Kategorie zu
+      card.draggable = true;
+      card.addEventListener('dragstart', function (ev) {
+        ev.dataTransfer.setData('text/plain', c.cid);
+        ev.dataTransfer.effectAllowed = 'move';
+        card.classList.add('dragging');
+        document.body.classList.add('cat-dragging');
+      });
+      card.addEventListener('dragend', function () {
+        card.classList.remove('dragging');
+        document.body.classList.remove('cat-dragging');
+        Array.prototype.forEach.call(document.querySelectorAll('.cat-chip'), function (x) {
+          x.classList.remove('drop');
+        });
+      });
       // Klick auf Bild/Zähler markiert den Typ in den Ansichten (Name + Platzieren
       // haben ihre eigene Funktion und stoppen den Klick selbst).
       thumb.addEventListener('click', function () { setCatMark(c.cid); });
@@ -5388,7 +5473,7 @@
         ? ('Besuchermodus — ' + n + (hatRef
             ? ' Kategorie(n) im Katalog, nach Ähnlichkeit zu den festen Rampen eingeordnet.'
             : ' Rampentyp(en) im Katalog. Hinweis: ohne gepinnte Rampen gibt es keine Vergleichsbasis — im Betreibermodus die festen Elemente pinnen.'))
-        : 'Besuchermodus — es sind keine beweglichen Rampen vorhanden (alles gepinnt?).');
+        : 'Besuchermodus — noch ist alles fest verbaut. Im Betreibermodus in der Szene-Liste den 📌 der Rampen lösen, die der Besucher bewegen darf.');
       tutMaybeOffer();
     } else {
       cancelPlacement();
@@ -5541,47 +5626,62 @@
   // ═════════════════════════════════════════════════════════════════
   //  Export mit Layer-Auswahl
   // ═════════════════════════════════════════════════════════════════
+  // Jede Rampe gehört zu GENAU EINER Exportgruppe — so bleibt die Auswahl
+  // eindeutig. Reihenfolge der Zuständigkeit:
+  //   1. selbst angelegter Besucher-Layer (r.vLayer)
+  //   2. sonst die Katalog-Kategorie (QTRS, BNKS, … — auch per Drag & Drop änderbar)
+  //   3. sonst der Layer aus der Rhino-Datei (gilt für die festen Elemente)
+  function exportGroupOf(r) {
+    if (r.vLayer) return r.vLayer;
+    for (var i = 0; i < catalog.length; i++) {
+      if (catalog[i].cid === r.visCid && catalog[i].cat) return catalog[i].cat;
+    }
+    var l = layerByName(r.layer);
+    return (l && (l.name || l.key)) || 'Ohne Layer';
+  }
+
   function openExportModal() {
     var list = document.getElementById('expList');
     if (!list) { exportJson(); return; }
     list.innerHTML = '';
 
-    var gruppen = visLayers.map(function (n) { return { key: n, label: n }; });
-    var ohne = ramps.filter(function (r) { return r.mesh.visible && !r.vLayer; }).length;
-    if (ohne) gruppen.push({ key: null, label: 'Ohne Layer' });
+    // Gruppen aus dem tatsächlichen Bestand aufbauen, nicht nur aus den
+    // selbst angelegten Layern — sonst stand hier nur ein einziger Haken.
+    var reihenfolge = [], anzahl = {};
+    ramps.forEach(function (r) {
+      if (!r.mesh.visible) return;
+      var g = exportGroupOf(r);
+      if (anzahl[g] === undefined) { anzahl[g] = 0; reihenfolge.push(g); }
+      anzahl[g]++;
+    });
+    if (!reihenfolge.length) { exportJson(); return; }
+    reihenfolge.sort();
 
-    if (!gruppen.length) { exportJson(); return; }   // nichts zu wählen
-
-    gruppen.forEach(function (g, i) {
-      var n = ramps.filter(function (r) {
-        return r.mesh.visible && (g.key === null ? !r.vLayer : r.vLayer === g.key);
-      }).length;
+    reihenfolge.forEach(function (g) {
       var row = document.createElement('label'); row.className = 'exp-row';
       var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = true;
-      cb.dataset.key = (g.key === null ? '' : g.key);
-      cb.dataset.ohne = (g.key === null ? '1' : '');
-      var nm = document.createElement('span'); nm.className = 'exp-name'; nm.textContent = g.label;
+      cb.dataset.key = g;
+      var nm = document.createElement('span'); nm.className = 'exp-name'; nm.textContent = g;
       var ct = document.createElement('span'); ct.className = 'exp-count';
-      ct.textContent = n + (n === 1 ? ' Objekt' : ' Objekte');
+      ct.textContent = anzahl[g] + (anzahl[g] === 1 ? ' Objekt' : ' Objekte');
       row.appendChild(cb); row.appendChild(nm); row.appendChild(ct);
       list.appendChild(row);
     });
+
+    var alle = document.getElementById('expAll');
+    if (alle) alle.checked = true;
     document.getElementById('expModal').classList.add('show');
   }
 
   function runExportFromModal() {
     var boxes = document.querySelectorAll('#expList input[type=checkbox]');
-    var namen = [], ohneAn = false;
+    var gewaehlt = [];
     Array.prototype.forEach.call(boxes, function (cb) {
-      if (!cb.checked) return;
-      if (cb.dataset.ohne === '1') ohneAn = true;
-      else namen.push(cb.dataset.key);
+      if (cb.checked) gewaehlt.push(cb.dataset.key);
     });
-    if (!namen.length && !ohneAn) { status('Kein Layer ausgewählt — nichts exportiert.'); return; }
+    if (!gewaehlt.length) { status('Kein Layer angehakt — nichts exportiert.'); return; }
     document.getElementById('expModal').classList.remove('show');
-    exportJson(function (r) {
-      return r.vLayer ? namen.indexOf(r.vLayer) !== -1 : ohneAn;
-    });
+    exportJson(function (r) { return gewaehlt.indexOf(exportGroupOf(r)) !== -1; });
   }
 
   function bindVisitorUI() {
@@ -5612,6 +5712,12 @@
       ev.stopPropagation();
     });
     var eo = byId('expOk'); if (eo) eo.addEventListener('click', runExportFromModal);
+    var ea = byId('expAll');
+    if (ea) ea.addEventListener('change', function () {
+      Array.prototype.forEach.call(
+        document.querySelectorAll('#expList input[type=checkbox]'),
+        function (cb) { cb.checked = ea.checked; });
+    });
     var ec = byId('expCancel'); if (ec) ec.addEventListener('click', function () {
       byId('expModal').classList.remove('show');
     });
@@ -5815,6 +5921,18 @@
         '<path class="ln" d="M36 48 h24" opacity=".35"/>' + close;
     }
 
+    if (kind === 'export') {
+      // Datei mit Pfeil nach unten — Entwurf sichern
+      return open +
+        '<rect class="bd" x="18" y="10" width="28" height="36" rx="4"/>' +
+        '<path class="ln" d="M24 20 h16 M24 27 h16 M24 34 h10"/>' +
+        '<g class="a-slide" style="animation-name:tut-fall">' +
+          '<path class="acc" d="M32 40 v14" stroke-width="3"/>' +
+          '<path class="acc" d="M26 48 l6 6 l6 -6" stroke-width="3"/>' +
+        '</g>' +
+        '<path class="ln" d="M14 60 h36" opacity=".45"/>' + close;
+    }
+
     // 'done'
     return open +
       '<circle class="acc" cx="32" cy="32" r="18" opacity=".3"/>' +
@@ -5859,6 +5977,10 @@
       { task: 'Öffne den Reiter 📚 Katalog und tippe auf ein Rampenbild.',
         why: 'Der Katalog ist der Bestand der Halle — neue Rampen kommen nicht dazu. Ein Tipp aufs Bild lässt alle Exemplare dieses Typs aufleuchten. Nimmst du eine Rampe heraus, bleibt ihre Karte unter „Entfernt“ stehen und du kannst sie zurücklegen.',
         ev: 'catmark', anim: 'catalog', ok: 'So findest du jeden Rampentyp in der Halle wieder.' },
+
+      { task: 'Speichere deinen Entwurf: ☰ Menü → 💾 Entwurf als JSON speichern.',
+        why: 'Vor dem Speichern fragt die App, welche Layer mitsollen — jede Gruppe mit Objektzahl zum Anhaken. So kannst du auch nur einen Teil deiner Halle ausgeben.',
+        ev: 'export', anim: 'export', ok: 'Gespeichert — die Datei liegt in deinen Downloads.' },
 
       { task: 'Fertig — jetzt bist du dran!',
         why: 'Dein Entwurf lässt sich über ☰ Menü → 💾 „Entwurf als JSON speichern“ sichern. Verklickt? Mit ↶ geht jeder Schritt zurück. Das Tutorial startest du jederzeit erneut über ☰ Menü → Hilfe.',

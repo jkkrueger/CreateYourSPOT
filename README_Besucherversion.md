@@ -125,10 +125,14 @@ für beides.
 **Betreibermodus** (Start) — die volle Werkzeugpalette. Hier wird die Halle
 vorbereitet: `.3dm` laden, Layer ordnen, messen, und vor allem **pinnen**.
 
-> 📌 **Der Pin ist der Schalter.** Alles, was der Betreiber pinnt (Objekt-Pin in
-> der Szene-Liste oder Layer-Pin für einen ganzen Layer), gilt als *fest
-> verbaut*. Alles Ungepinnte gilt als *beweglich* — das ist genau das, womit
-> der Besucher später spielen darf.
+> 📌 **Der Pin ist der Schalter.** Gepinnt = *fest verbaut*, ungepinnt =
+> *beweglich*. Alles Ungepinnte ist genau das, womit der Besucher spielen darf.
+>
+> **Voreinstellung: alles gepinnt.** Beim Laden einer `.3dm` gilt zunächst die
+> gesamte Halle als fest. Der Betreiber gibt gezielt frei, was beweglich sein
+> soll, indem er in der Szene-Liste den 📌 der jeweiligen Rampen (oder eines
+> ganzen Layers) löst. Das ist die sichere Richtung — sonst wäre versehentlich
+> die komplette Halle verschiebbar.
 
 **Besuchermodus** — über `👥 Besucher` unten in der Icon-Leiste. Beim Wechsel
 passiert dreierlei:
@@ -173,6 +177,16 @@ Zwei Filter greifen zusammen:
 - **Typ:** Chips mit Farbpunkt und Anzahl je Kategorie — beliebig viele
   gleichzeitig wählbar. Keiner gewählt = alle Typen.
 
+**Kategorie per Drag & Drop ändern:** Eine Karte auf einen Typ-Chip ziehen
+ordnet die Rampe dieser Kategorie zu und übernimmt deren Farbe. Diese
+Zuweisung schlägt die automatische Einordnung dauerhaft — praktisch, um die
+Treffer des Ähnlichkeitsverfahrens zu korrigieren.
+
+**Namen bleiben manuell.** Der vorgeschlagene Name (`QTRS 1`, `BNKS 2` …) lässt
+sich im Katalog direkt überschreiben. Ein selbst vergebener Name wird
+**nie automatisch ersetzt** — auch nicht beim Kategoriewechsel. Eine nach
+„QTRS" verschobene Karte behält also ihren Namen, bis du ihn selbst änderst.
+
 > An `spotSkatehalle_IST.3dm` geprüft (Szenario „Mobile Ramps beweglich"):
 > 20 bewegliche Rampen ergeben **20 Karten**, filterbar nach 4 Typen
 > (BNKS 6, Flats/Ebenen 12, QTRS 1, Walls 1). Vorher waren es 4 Karten für
@@ -200,8 +214,9 @@ Aktion wirklich passiert ist:
 3. Eine **namentlich genannte Rampe suchen und auswählen** — der Typ mit den
    meisten Exemplaren wird automatisch als Suchziel gewählt
 4. Diese Rampe verschieben
-5. Über den Katalog eine Rampe nachlegen
-6. Abschluss mit Hinweis auf Speichern und Rückgängig
+5. Im Katalog einen Rampentyp markieren
+6. Den Entwurf als JSON speichern (inklusive Layer-Auswahl)
+7. Abschluss mit Hinweis auf Rückgängig
 
 Jederzeit neu startbar über *☰ Menü → Hilfe → 🎓 Tutorial starten*, abbrechbar
 über das ✕ der Karte.
@@ -266,9 +281,17 @@ sie wieder heraus, das ✕ löscht den Layer (die Rampen bleiben erhalten). Jede
 Rampe gehört zu höchstens einem Besucher-Layer; die Rhino-Layer bleiben davon
 unberührt, damit Kategorie und Einfärbung erhalten bleiben.
 
-Beim **JSON-Export** fragt die App, welche dieser Layer mitsollen — jede Gruppe
-mit Objektzahl zum Anhaken, plus „Ohne Layer". Im JSON steht der gewählte Layer
-je Element unter `visitorLayer`.
+### Export nach Layern
+
+Beim **JSON-Export** fragt die App, welche Gruppen mitsollen — jede mit
+Objektzahl zum Anhaken, dazu ein „Alle / keine"-Schalter. Jede Rampe gehört zu
+**genau einer** Gruppe, damit die Auswahl eindeutig bleibt:
+
+1. der selbst angelegte Besucher-Layer, falls gesetzt
+2. sonst die Katalog-Kategorie (`QTRS`, `BNKS` … — per Drag & Drop änderbar)
+3. sonst der Layer aus der Rhino-Datei (das betrifft die festen Elemente)
+
+Im JSON steht der Besucher-Layer je Element zusätzlich unter `visitorLayer`.
 
 ### Farbgebung
 
