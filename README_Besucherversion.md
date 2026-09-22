@@ -8,7 +8,7 @@ Ausführliche Bedienung: `Tutorial_Skatepark_Planer.txt`.
 
 ## Online-Version
 
-**https://jkkrueger.github.io/skatehalle/**
+**https://jkkrueger.github.io/CreateYourSPOT/**
 
 Läuft direkt im Browser — auch am Handy, ohne Installation und ohne lokalen
 Server. Die hinterlegte Skatehalle wird beim Öffnen automatisch geladen.
