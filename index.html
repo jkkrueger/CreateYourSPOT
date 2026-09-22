@@ -4103,7 +4103,13 @@
   function loadSampleList() {
     var box = document.getElementById('sampleList');
     if (window.__fileProtocol) {
-      box.innerHTML = '<div class="ramp-empty">Nur über einen lokalen Server verfügbar (siehe README).</div>';
+      // Konkret sagen, was zu tun ist — der Nutzer sitzt genau jetzt vor dem Problem.
+      box.innerHTML = '<div class="v-empty" style="text-align:left">' +
+        '<b>Per Doppelklick geöffnet.</b><br>' +
+        'Der Browser blockiert hier das Nachladen von Dateien — deshalb lädt die ' +
+        'Skatehalle nicht automatisch.<br><br>' +
+        'Stattdessen <b>Start_Offline.ps1</b> ausführen und im Browser ' +
+        '<b>http://localhost:8000</b> öffnen.</div>';
       return;
     }
     fetch('samples/index.json').then(function (r) {
