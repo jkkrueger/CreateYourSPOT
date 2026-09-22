@@ -463,6 +463,15 @@
     border-top-width: 4px; border-radius: 12px; overflow: hidden;
     transition: transform .18s var(--ease-snap), box-shadow .18s var(--ease-snap);
   }
+  /* WICHTIG: In einer Flex-Spalte dürfen Kinder standardmäßig schrumpfen
+     (flex: 0 1 auto). Das Vorschaubild tut das nicht (flex: 0 0 auto) — sobald
+     die Kartenhöhe von außen begrenzt wird, werden deshalb ausgerechnet Name,
+     Maße und Button auf Höhe 0 zusammengedrückt und die Karte zeigt nur noch
+     das Bild. Darum hier explizit: nichts auf der Karte schrumpft. */
+  .cat-card > * { flex: 0 0 auto; }
+  /* Und die Karte bringt ihre Inhaltshöhe selbst mit, statt sie von der
+     Rasterzeile vorgeschrieben zu bekommen. */
+  .cat-card { min-height: max-content; }
   .cat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,.35); }
   .cat-card.armed { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(232,163,61,.22); }
   /* Gestaffeltes Einblenden beim Öffnen des Drawers / Seitenwechsel (animation-delay
@@ -477,9 +486,11 @@
   }
   .cat-card-thumb img { width: 100%; height: 100%; object-fit: contain; }
   .cat-card-name {
-    width: auto; font-size: 13px; font-weight: 700; margin: 9px 10px 0; padding: 4px 5px;
+    width: auto; min-height: 26px; box-sizing: border-box;
+    font-size: 13.5px; font-weight: 700; margin: 9px 9px 0; padding: 4px 6px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    background: transparent; border: 1px solid transparent; border-radius: 6px; color: var(--text);
+    background: rgba(255,255,255,.04); border: 1px solid transparent; border-radius: 6px;
+    color: var(--text); font-family: inherit;
   }
   .cat-card-name { transition: background .15s var(--ease-snap), border-color .15s var(--ease-snap); }
   .cat-card-name:hover { border-color: var(--line); }
@@ -487,12 +498,13 @@
   .cat-card-count {
     font-size: 11px; font-weight: 600; color: var(--accent); padding: 4px 10px 0; cursor: pointer;
   }
-  /* Maße der Rampe — die eigentliche Sachinformation auf der Karte */
+  /* Maße der Rampe — Länge, Breite, Höhe als eigene Zeile mit Beschriftung */
   .cat-card-dims {
-    font-size: 11px; color: var(--muted); padding: 3px 10px 0; line-height: 1.45;
-    font-variant-numeric: tabular-nums;
+    display: flex; gap: 8px; padding: 6px 10px 0;
+    font-size: 11px; color: var(--text); font-variant-numeric: tabular-nums;
   }
-  .cat-card-hint { font-size: 10px; color: #5e646d; padding: 3px 10px 0; font-style: italic; }
+  .cat-card-dims span { display: flex; gap: 3px; align-items: baseline; }
+  .cat-card-dims b { font-weight: 700; color: var(--muted); font-size: 9.5px; text-transform: uppercase; }
   .cat-drawer-nav {
     flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 14px;
     padding: 10px; border-top: 1px solid var(--line); background: var(--panel-2); font-size: 12px; color: var(--muted);
@@ -5118,15 +5130,25 @@
       var cnt = document.createElement('div'); cnt.className = 'cat-card-count';
       cnt.textContent = drin ? 'in der Halle' : 'herausgenommen';
 
-      // Maße aus der Katalog-Geometrie — die eigentliche Sachinformation der Karte
-      var dims = document.createElement('div'); dims.className = 'cat-card-dims';
+      // Maße aus der Katalog-Geometrie: Länge, Breite, Höhe — je beschriftet,
+      // damit klar ist, welche Zahl wofür steht.
       if (!c.geo.boundingBox) c.geo.computeBoundingBox();
       var cbb = c.geo.boundingBox;
-      dims.textContent = 'L ' + Math.round(cbb.max.x - cbb.min.x) +
-                       ' · B ' + Math.round(cbb.max.z - cbb.min.z) +
-                       ' · H ' + Math.round(cbb.max.y - cbb.min.y) + ' cm';
-      var hint = document.createElement('div'); hint.className = 'cat-card-hint';
-      hint.textContent = 'Klick = in der Halle zeigen';
+      var mL = Math.round(cbb.max.x - cbb.min.x);
+      var mB = Math.round(cbb.max.z - cbb.min.z);
+      var mH = Math.round(cbb.max.y - cbb.min.y);
+      var dims = document.createElement('div'); dims.className = 'cat-card-dims';
+      [['L', mL], ['B', mB], ['H', mH]].forEach(function (d) {
+        var sp = document.createElement('span');
+        var lb = document.createElement('b'); lb.textContent = d[0];
+        var vl = document.createElement('span'); vl.textContent = d[1];
+        sp.appendChild(lb); sp.appendChild(vl); dims.appendChild(sp);
+      });
+      var einheit = document.createElement('span');
+      einheit.textContent = 'cm'; einheit.style.color = 'var(--muted)';
+      dims.appendChild(einheit);
+      // Der frühere Hinweistext kostete eine ganze Zeile — steckt jetzt im Tooltip.
+      card.title = c.name + ' — ' + mL + ' × ' + mB + ' × ' + mH + ' cm · Klick zeigt sie in der Halle';
       var gone = document.createElement('div'); gone.className = 'cat-card-gone';
       gone.textContent = raus ? 'liegt im Papierkorb' : '';
 
@@ -5150,9 +5172,11 @@
       cnt.style.cursor = 'pointer';
       cnt.title = 'In den Ansichten markieren';
 
-      card.appendChild(thumb); card.appendChild(nm); card.appendChild(cnt);
+      // Reihenfolge: Bild · Name · Maße · Zustand · Aktion
+      card.appendChild(thumb); card.appendChild(nm); card.appendChild(dims);
+      card.appendChild(cnt);
       if (raus) card.appendChild(gone);
-      card.appendChild(dims); card.appendChild(hint); card.appendChild(add);
+      card.appendChild(add);
       grid.appendChild(card);
     });
   }
