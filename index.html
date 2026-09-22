@@ -449,18 +449,21 @@
     background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px;
   }
   .cat-drawer-head button:hover { color: var(--danger); }
+  /* Bewusst umbrechendes FLEXBOX statt CSS-Grid.
+     Mit Grid wurde die Zeilenhöhe trotz grid-auto-rows: auto kleiner berechnet
+     als die Karten hoch sind (~139px statt ~190px). Die Karten ragten dadurch
+     aus ihrer Zeile heraus und ihr unterer Teil — Name, Maße, Zustand — wurde
+     von der nächsten Kartenreihe verdeckt. Sichtbar wurde er nur beim Hovern,
+     weil transform die Karte in eine eigene Stapelebene hebt.
+     Flexbox kennt keine Track-Berechnung: eine Zeile ist immer so hoch wie ihr
+     höchstes Element, Inhalt kann also nicht verdeckt werden. */
   .cat-drawer-grid {
-    flex: 1; overflow-y: auto; padding: 16px; display: grid;
-    /* auto-fill statt fester 3 Spalten: der Drawer ist per Anfasser breiten-verstellbar,
-       das Raster folgt der Breite von selbst (1-n Spalten) statt zu quetschen.
-       grid-auto-rows: auto — mit 1fr wurden alle Zeilen auf gleiche Höhe gezwungen und
-       die Textzeilen darunter zusammengequetscht. */
-    grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
-    grid-auto-rows: auto; gap: 14px; align-content: start;
-    /* align-items: start — jede Karte ist genau so hoch wie ihr Inhalt und
-       bekommt keine Zeilenhöhe aufgezwungen, an der sie sich strecken müsste. */
-    align-items: start;
+    flex: 1; overflow-y: auto; padding: 16px;
+    display: flex; flex-wrap: wrap; align-content: flex-start; gap: 14px;
   }
+  .cat-drawer-grid > .cat-card { flex: 1 1 178px; max-width: 100%; }
+  /* Leermeldung soll die ganze Breite einnehmen */
+  .cat-drawer-grid > .v-empty { flex: 1 1 100%; }
   /* Die Karte ist bewusst KEIN Flex-Container.
      Vorher war sie eine Flex-Spalte: dort dürfen Kinder schrumpfen, das
      Vorschaubild aber nicht — sobald die Kartenhöhe irgendwo begrenzt wurde,
@@ -470,7 +473,10 @@
      Inhaltshöhe ein und die Karte wächst mit. */
   .cat-card {
     display: block; background: var(--panel-2); border: 1px solid var(--line);
-    border-top-width: 4px; border-radius: 12px; overflow: hidden;
+    border-top-width: 4px; border-radius: 12px;
+    /* KEIN overflow: hidden — sonst koennte Karteninhalt abgeschnitten werden,
+       falls die Kartenhoehe je wieder begrenzt wird. Die Ecken rundet
+       stattdessen das Vorschaubild selbst. */
     padding-bottom: 10px;
     transition: transform .18s var(--ease-snap), box-shadow .18s var(--ease-snap);
   }
@@ -485,6 +491,7 @@
        die ganze Karte und die Infozeilen bleiben unleserlich. */
     height: 104px; background: var(--panel);
     display: flex; align-items: center; justify-content: center;
+    border-radius: 8px 8px 0 0; overflow: hidden;   /* rundet die Oberkante der Karte */
   }
   .cat-card-thumb img { width: 100%; height: 100%; object-fit: contain; }
   .cat-card-name {
@@ -5093,15 +5100,15 @@
     if (!grid) return;
     grid.innerHTML = '';
     if (!catalog.length) {
-      grid.innerHTML = '<div class="v-empty" style="grid-column:1/-1">Keine beweglichen Rampen vorhanden.<br>' +
+      grid.innerHTML = '<div class="v-empty">Keine beweglichen Rampen vorhanden.<br>' +
         'Der Betreiber legt fest, was beweglich ist (alles Ungepinnte).</div>';
       return;
     }
     if (!sichtbar.length) {
-      grid.innerHTML = '<div class="v-empty" style="grid-column:1/-1">' +
+      grid.innerHTML = '<div class="v-empty">' +
         (catFilter === 'entfernt'
           ? 'Du hast noch keine Rampe aus der Halle genommen.'
-          : 'Kein Rampentyp steht gerade in der Halle.') + '</div>';
+          : 'Gerade steht keine Rampe dieser Auswahl in der Halle.') + '</div>';
       return;
     }
     var start = catPage * CAT_PAGE_SIZE;
